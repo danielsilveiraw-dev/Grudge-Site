@@ -12,6 +12,16 @@ type AdminHeaderProps = {
   subtitle: string;
 };
 
+type AdminUser = {
+  name?: string | null;
+  email?: string | null;
+  image?: string | null;
+
+  discordId?: string;
+  permissions?: string[];
+  role?: string;
+};
+
 const PERMISSION_LABELS: Record<string, string> = {
   calendar: 'Calendário',
   riddles: 'Enigmas',
@@ -28,14 +38,10 @@ export default async function AdminHeader({
 }: AdminHeaderProps) {
   const session = await auth();
 
-  const user =
-    session?.user as
-      | (typeof session.user & {
-          discordId?: string;
-          permissions?: string[];
-          role?: string;
-        })
-      | undefined;
+  const user: AdminUser | undefined =
+    session?.user
+      ? (session.user as AdminUser)
+      : undefined;
 
   const permissions =
     Array.isArray(user?.permissions)

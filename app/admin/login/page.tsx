@@ -14,6 +14,13 @@ type AdminLoginPageProps = {
   }>;
 };
 
+type LoginUser = {
+  name?: string | null;
+  email?: string | null;
+  image?: string | null;
+  discordId?: string;
+};
+
 function DiscordIcon({
   size = 22,
 }: {
@@ -39,9 +46,7 @@ function getErrorMessage(
     return null;
   }
 
-  if (
-    error === 'AccessDenied'
-  ) {
+  if (error === 'AccessDenied') {
     return 'Sua conta do Discord não possui acesso ao painel.';
   }
 
@@ -53,17 +58,15 @@ export default async function AdminLoginPage({
 }: AdminLoginPageProps) {
   const session = await auth();
 
-  const user =
-    session?.user as
-      | (typeof session.user & {
-          discordId?: string;
-        })
-      | undefined;
+  const user: LoginUser | undefined =
+    session?.user
+      ? (session.user as LoginUser)
+      : undefined;
 
   /*
-   * Só redirecionamos para o painel
-   * se a sessão pertence a um staff
-   * que continua cadastrado.
+   * Se já existe uma sessão válida e
+   * a conta ainda está cadastrada como staff,
+   * manda direto para o painel.
    */
   if (user?.discordId) {
     const staff =
@@ -72,9 +75,7 @@ export default async function AdminLoginPage({
       );
 
     if (staff) {
-      redirect(
-        '/admin/calendario',
-      );
+      redirect('/admin/calendario');
     }
   }
 
@@ -94,9 +95,7 @@ export default async function AdminLoginPage({
         <div className="p-7 sm:p-9">
           <div className="mb-7 text-center">
             <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-line-soft bg-bg-deep/45 text-accent-soft">
-              <DiscordIcon
-                size={30}
-              />
+              <DiscordIcon size={30} />
             </div>
 
             <h1 className="font-display text-3xl font-semibold text-text-main">
@@ -104,9 +103,8 @@ export default async function AdminLoginPage({
             </h1>
 
             <p className="mx-auto mt-3 max-w-[320px] text-[0.8rem] leading-relaxed text-text-dim">
-              Entre com sua conta do
-              Discord. Apenas membros
-              autorizados possuem
+              Entre com sua conta do Discord.
+              Apenas membros autorizados possuem
               acesso.
             </p>
           </div>
@@ -122,8 +120,8 @@ export default async function AdminLoginPage({
               'use server';
 
               /*
-               * Remove primeiro qualquer
-               * sessão antiga/incompleta.
+               * Remove uma sessão antiga/incompleta
+               * antes de iniciar um novo login.
                */
               await signOut({
                 redirect: false,

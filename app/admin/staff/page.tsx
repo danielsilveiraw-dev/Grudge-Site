@@ -5,6 +5,7 @@ import AdminHeader from '../AdminHeader';
 import {
   getStaffMembers,
   STAFF_PERMISSIONS,
+  type StaffPermission,
 } from '@/lib/staff';
 
 import { requireMasterPage } from '@/lib/admin-access';
@@ -15,7 +16,8 @@ import {
   deleteStaffAction,
 } from './actions';
 
-const PERMISSION_LABELS = {
+const PERMISSION_LABELS: Record<StaffPermission, string> = {
+  all: 'Acesso total',
   calendar: 'Calendário',
   riddles: 'Enigmas',
   music: 'Músicas',
@@ -23,7 +25,7 @@ const PERMISSION_LABELS = {
   logs: 'Logs',
   staffs: 'Staffs',
   support: 'Apoie',
-} as const;
+};
 
 export default async function AdminStaffPage() {
   // Somente usuários com "all" podem administrar staffs
@@ -227,9 +229,7 @@ export default async function AdminStaffPage() {
                           key={permission}
                           className="rounded-full border border-line-soft px-2.5 py-1 text-[0.65rem] text-text-dim"
                         >
-                          {PERMISSION_LABELS[
-                            permission
-                          ]}
+                          {PERMISSION_LABELS[permission]}
                         </span>
                       ),
                     )
@@ -299,11 +299,7 @@ export default async function AdminStaffPage() {
                             />
 
                             <span className="text-[0.72rem] text-text-dim">
-                              {
-                                PERMISSION_LABELS[
-                                  permission
-                                ]
-                              }
+                              {PERMISSION_LABELS[permission]}
                             </span>
                           </label>
                         ),
