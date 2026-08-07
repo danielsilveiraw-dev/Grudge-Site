@@ -11,6 +11,8 @@ import GlobalPlayer from '@/components/GlobalPlayer';
 import SideMenu from '@/components/SideMenu';
 import { getSongs } from '@/lib/music';
 
+export const dynamic = 'force-dynamic';
+
 const display = Cormorant_Garamond({
   subsets: ['latin'],
   weight: ['500', '600'],
