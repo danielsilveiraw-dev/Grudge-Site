@@ -1,21 +1,29 @@
 import { redirect } from 'next/navigation';
 
 import { auth } from '@/auth';
-import type { StaffPermission } from '@/lib/staff';
+
+import {
+  getStaffByDiscordId,
+  type StaffPermission,
+} from '@/lib/staff';
 
 export type AdminPermission =
   Exclude<StaffPermission, 'all'>;
 
-type AdminSessionUser = {
+type SessionUser = {
   name?: string | null;
   email?: string | null;
   image?: string | null;
-
   discordId?: string;
-  permissions?: string[];
-  role?: string;
 };
 
+/**
+ * Busca o usuário autenticado E as permissões
+ * diretamente do data/staff.json.
+ *
+ * Assim não dependemos de permissões antigas
+ * armazenadas dentro da sessão.
+ */
 export async function getAdminUser() {
   const session = await auth();
 
@@ -24,21 +32,48 @@ export async function getAdminUser() {
   }
 
   const user =
-    session.user as AdminSessionUser;
+    session.user as SessionUser;
 
-  const permissions =
-    Array.isArray(user.permissions)
-      ? user.permissions
-      : [];
+  const discordId =
+    user.discordId ?? '';
+
+  if (!discordId) {
+    return null;
+  }
+
+  const staff =
+    await getStaffByDiscordId(discordId);
+
+  if (!staff) {
+    return null;
+  }
 
   return {
-    ...user,
-    permissions,
+    name:
+      user.name ??
+      staff.name ??
+      'Staff',
+
+    email:
+      user.email ?? null,
+
+    image:
+      user.image ??
+      staff.image ??
+      null,
+
+    discordId,
+
+    role:
+      staff.role,
+
+    permissions:
+      staff.permissions,
   };
 }
 
 export function hasAdminPermission(
-  permissions: string[],
+  permissions: StaffPermission[],
   permission: AdminPermission,
 ) {
   return (
@@ -48,15 +83,19 @@ export function hasAdminPermission(
 }
 
 /**
- * Para páginas administrativas.
- *
- * - sem login -> /admin/login
- * - sem permissão -> /admin/sem-acesso
+ * Proteção para páginas administrativas.
  */
 export async function requireAdminPage(
   permission: AdminPermission,
 ) {
-  const user = await getAdminUser();
+  const session = await auth();
+
+  if (!session?.user) {
+    redirect('/admin/login');
+  }
+
+  const user =
+    await getAdminUser();
 
   if (!user) {
     redirect('/admin/login');
@@ -75,19 +114,28 @@ export async function requireAdminPage(
 }
 
 /**
- * Para Server Actions.
+ * Proteção para Server Actions.
  *
- * Nunca dependa apenas do cadeado visual do menu.
- * A própria ação também verifica a permissão.
+ * Consulta o staff.json novamente em cada ação,
+ * garantindo que as permissões estejam atualizadas.
  */
 export async function requireAdminAction(
   permission: AdminPermission,
 ) {
-  const user = await getAdminUser();
+  const session = await auth();
+
+  if (!session?.user) {
+    throw new Error(
+      'Você precisa estar autenticado.',
+    );
+  }
+
+  const user =
+    await getAdminUser();
 
   if (!user) {
     throw new Error(
-      'Você precisa estar autenticado.',
+      'Sua conta não possui acesso ao painel.',
     );
   }
 
@@ -106,32 +154,55 @@ export async function requireAdminAction(
 }
 
 /**
- * Apenas usuários master.
+ * Somente usuários com "all".
  */
 export async function requireMasterPage() {
-  const user = await getAdminUser();
+  const session = await auth();
+
+  if (!session?.user) {
+    redirect('/admin/login');
+  }
+
+  const user =
+    await getAdminUser();
 
   if (!user) {
     redirect('/admin/login');
   }
 
-  if (!user.permissions.includes('all')) {
+  if (
+    !user.permissions.includes('all')
+  ) {
     redirect('/admin/sem-acesso');
   }
 
   return user;
 }
 
+/**
+ * Proteção das ações de gerenciamento de Staff.
+ */
 export async function requireMasterAction() {
-  const user = await getAdminUser();
+  const session = await auth();
 
-  if (!user) {
+  if (!session?.user) {
     throw new Error(
       'Você precisa estar autenticado.',
     );
   }
 
-  if (!user.permissions.includes('all')) {
+  const user =
+    await getAdminUser();
+
+  if (!user) {
+    throw new Error(
+      'Sua conta não possui acesso ao painel.',
+    );
+  }
+
+  if (
+    !user.permissions.includes('all')
+  ) {
     throw new Error(
       'Somente usuários com acesso total podem realizar esta ação.',
     );
