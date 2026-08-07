@@ -1,0 +1,26 @@
+[
+  {
+    "id": "77bfe3bb-20da-41eb-a53d-41c273e0dae3",
+    "name": "Ordinary Love - Vicki Vox",
+    "audio": "/uploads/music/audio/8cd966a9-ace1-44fa-a56f-32b7cde30a1b.mp3",
+    "cover": "/uploads/music/covers/1fa28645-60e8-46ec-95a4-91effd964d42.png",
+    "createdAt": "2026-08-04T12:35:55.549Z",
+    "pages": [
+      "/",
+      "/alfabeto",
+      "/calendario",
+      "/enigmas"
+    ]
+  },
+  {
+    "id": "c2f0744e-c61f-4a49-b19f-4b65cbda554a",
+    "name": "Bad Day- Alvin e os esquilos",
+    "audio": "/uploads/music/audio/6d6f65c1-c838-48a1-8714-a09a5572a111.mp3",
+    "cover": "/uploads/music/covers/b3d00426-bf88-4d26-bb03-df65ba63fb55.png",
+    "createdAt": "2026-08-04T12:38:13.977Z",
+    "pages": [
+      "/",
+      "/calendario"
+    ]
+  }
+]

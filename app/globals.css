@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-display: 'Cormorant Garamond', 'Iowan Old Style', Georgia, serif;
+  --font-body: 'Manrope', system-ui, sans-serif;
+  /* Fonte personalizada — troque o arquivo public/assets/custom-font.* quando enviado */
+  --font-custom: 'CustomAlphabet', var(--font-display);
+}
+
+/* Fonte personalizada do Dani (Fluxya) */
+@font-face {
+  font-family: 'CustomAlphabet';
+  src: url('/assets/custom-font.ttf') format('truetype');
+  font-display: swap;
+}
+
+html,
+body {
+  min-height: 100%;
+  background:
+    radial-gradient(120% 90% at 15% 0%, #6e1743 0%, transparent 55%),
+    radial-gradient(140% 100% at 100% 100%, #3a0a26 0%, transparent 60%),
+    #170410;
+}
+
+::selection {
+  background: #ff3d81;
+  color: #170410;
+}
+
+@keyframes driftFade {
+  0% {
+    opacity: 0;
+    transform: translateY(0) scale(0.9);
+  }
+  15% {
+    opacity: var(--peak, 0.16);
+  }
+  50% {
+    opacity: var(--peak, 0.16);
+    transform: translateY(-14px) scale(1);
+  }
+  85% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-28px) scale(1.02);
+  }
+}
