@@ -116,12 +116,6 @@ export default async function AdminStreamersPage() {
                         X
                       </span>
                     )}
-
-                    {streamer.discord && (
-                      <span className="rounded-full border border-line-soft px-2 py-1 text-[0.65rem] text-text-dim">
-                        Discord
-                      </span>
-                    )}
                   </div>
                 </div>
 

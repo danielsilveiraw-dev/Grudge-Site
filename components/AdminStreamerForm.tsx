@@ -164,13 +164,6 @@ export default function AdminStreamerForm() {
           placeholder="X / Twitter"
           className="rounded-xl border border-line-soft bg-bg-deep/50 p-3 text-text-main focus:border-accent-hot focus:outline-none"
         />
-
-        <input
-          name="discord"
-          type="url"
-          placeholder="Discord"
-          className="rounded-xl border border-line-soft bg-bg-deep/50 p-3 text-text-main focus:border-accent-hot focus:outline-none sm:col-span-2"
-        />
       </div>
 
       {message && (

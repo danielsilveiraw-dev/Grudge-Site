@@ -38,7 +38,8 @@ export async function POST(request: Request) {
   try {
     await requireAdminAction('streamers');
 
-    const formData = await request.formData();
+    const formData =
+      await request.formData();
 
     const name =
       formData
@@ -140,12 +141,6 @@ export async function POST(request: Request) {
         ?.toString()
         .trim() ?? '';
 
-    const discord =
-      formData
-        .get('discord')
-        ?.toString()
-        .trim() ?? '';
-
     const youtube =
       formData
         .get('youtube')
@@ -184,7 +179,6 @@ export async function POST(request: Request) {
         name,
         image,
         instagram,
-        discord,
         youtube,
         twitch,
         kick,

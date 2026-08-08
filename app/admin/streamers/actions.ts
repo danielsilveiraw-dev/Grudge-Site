@@ -20,8 +20,7 @@ async function deleteImage(publicUrl?: string) {
     return;
   }
 
-  const supabase =
-    getSupabaseServer();
+  const supabase = getSupabaseServer();
 
   await supabase
     .storage
@@ -49,29 +48,21 @@ export async function deleteStreamerAction(
     return;
   }
 
-  const streamers =
-    await getStreamers();
+  const streamers = await getStreamers();
 
-  const target =
-    streamers.find(
-      (streamer) =>
-        streamer.id === id,
-    );
+  const target = streamers.find(
+    (streamer) => streamer.id === id,
+  );
 
   if (!target) {
     return;
   }
 
-  const supabase =
-    getSupabaseServer();
+  const supabase = getSupabaseServer();
 
-  await deleteImage(
-    target.image,
-  );
+  await deleteImage(target.image);
 
-  const {
-    error,
-  } = await supabase
+  const { error } = await supabase
     .from('streamers')
     .delete()
     .eq('id', id);
