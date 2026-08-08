@@ -46,17 +46,25 @@ function revalidateStreamerPages() {
 }
 
 export async function addStreamerAction(formData: FormData) {
+  console.log('🔵 addStreamerAction INICIOU');
+
   await requireAdminAction('streamers');
+  console.log('🟢 passou do requireAdminAction');
 
   const name = formData.get('name')?.toString().trim() ?? '';
   const image = formData.get('image') as File | null;
 
-  if (!name || !image || image.size === 0) return;
+  if (!name || !image || image.size === 0) {
+    console.log('🔴 saiu cedo: nome ou imagem faltando', { name, hasImage: !!image });
+    return;
+  }
 
   let imagePath: string | undefined;
 
   try {
+    console.log('🟡 antes do saveImage');
     imagePath = await saveImage(image);
+    console.log('🟢 saveImage OK:', imagePath);
 
     const { error } = await getSupabaseServer().from('streamers').insert({
       name,
@@ -70,13 +78,18 @@ export async function addStreamerAction(formData: FormData) {
       x: formData.get('x')?.toString().trim() ?? '',
     });
 
-    if (error) throw error;
+    if (error) {
+      console.log('🔴 erro no insert:', JSON.stringify(error));
+      throw error;
+    }
+
+    console.log('🟢 insert OK');
 
     await addLog('Streamer adicionado', name);
     revalidateStreamerPages();
   } catch (error) {
+    console.log('🔴 CATCH:', error instanceof Error ? error.message : String(error));
     if (imagePath) await deleteImage(imagePath);
-    console.warn('Erro ao adicionar streamer:', error);
   }
 }
 
