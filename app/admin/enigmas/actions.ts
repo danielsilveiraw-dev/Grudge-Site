@@ -1,12 +1,11 @@
 'use server';
 
-import fs from 'fs/promises';
-import path from 'path';
 import { randomUUID } from 'crypto';
 import { revalidatePath } from 'next/cache';
 
 import { addLog } from '@/lib/logs';
 import { requireAdminAction } from '@/lib/admin-access';
+import { getSupabaseServer } from '@/lib/supabase-server';
 
 import {
   getRiddles,
@@ -26,17 +25,34 @@ function getOptionalText(
   field: string,
 ) {
   const value =
-    formData.get(field)?.toString().trim() ?? '';
+    formData
+      .get(field)
+      ?.toString()
+      .trim() ?? '';
 
   return value || undefined;
 }
 
-function safeImageExtension(filename: string) {
-  const extension = path
-    .extname(filename)
-    .toLowerCase();
+function safeImageExtension(
+  filename: string,
+) {
+  const index =
+    filename.lastIndexOf('.');
 
-  if (!IMAGE_EXTENSIONS.has(extension)) {
+  if (index === -1) {
+    return null;
+  }
+
+  const extension =
+    filename
+      .slice(index)
+      .toLowerCase();
+
+  if (
+    !IMAGE_EXTENSIONS.has(
+      extension,
+    )
+  ) {
     return null;
   }
 
@@ -50,14 +66,18 @@ function normalizeExternalUrl(
     return undefined;
   }
 
-  const normalizedValue = value.trim();
+  const normalizedValue =
+    value.trim();
 
   if (!normalizedValue) {
     return undefined;
   }
 
   try {
-    const url = new URL(normalizedValue);
+    const url =
+      new URL(
+        normalizedValue,
+      );
 
     if (
       url.protocol !== 'http:' &&
@@ -72,9 +92,13 @@ function normalizeExternalUrl(
   }
 }
 
-async function saveImage(file: File) {
+async function saveImage(
+  file: File,
+) {
   const extension =
-    safeImageExtension(file.name);
+    safeImageExtension(
+      file.name,
+    );
 
   if (!extension) {
     throw new Error(
@@ -82,66 +106,118 @@ async function saveImage(file: File) {
     );
   }
 
-  const bytes = Buffer.from(
-    await file.arrayBuffer(),
-  );
-
   const filename =
     `${randomUUID()}${extension}`;
 
-  const uploadDirectory = path.join(
-    process.cwd(),
-    'public',
-    'uploads',
-    'riddles',
-  );
+  const bytes =
+    Buffer.from(
+      await file.arrayBuffer(),
+    );
 
-  await fs.mkdir(uploadDirectory, {
-    recursive: true,
-  });
+  const supabase =
+    getSupabaseServer();
 
-  await fs.writeFile(
-    path.join(
-      uploadDirectory,
+  const {
+    error: uploadError,
+  } = await supabase
+    .storage
+    .from('riddles')
+    .upload(
       filename,
-    ),
-    bytes,
-  );
+      bytes,
+      {
+        contentType:
+          file.type ||
+          'application/octet-stream',
+        upsert: false,
+      },
+    );
 
-  return `/uploads/riddles/${filename}`;
+  if (uploadError) {
+    console.error(
+      'Erro ao enviar imagem do enigma:',
+      uploadError,
+    );
+
+    throw uploadError;
+  }
+
+  const {
+    data: publicUrlData,
+  } = supabase
+    .storage
+    .from('riddles')
+    .getPublicUrl(
+      filename,
+    );
+
+  return publicUrlData.publicUrl;
 }
 
 async function deleteImage(
-  publicPath?: string,
+  publicUrl?: string,
 ) {
-  if (!publicPath) {
+  if (!publicUrl) {
     return;
   }
 
-  const normalizedPath =
-    publicPath.replace(/^\/+/, '');
+  // Ignora imagens antigas locais,
+  // como /uploads/riddles/arquivo.png
+  if (
+    !publicUrl.startsWith(
+      'http://',
+    ) &&
+    !publicUrl.startsWith(
+      'https://',
+    )
+  ) {
+    return;
+  }
 
-  const filePath = path.join(
-    process.cwd(),
-    'public',
-    normalizedPath,
-  );
+  const filename =
+    publicUrl
+      .split('?')[0]
+      .split('/')
+      .pop();
 
-  await fs
-    .unlink(filePath)
-    .catch(() => {});
+  if (!filename) {
+    return;
+  }
+
+  const supabase =
+    getSupabaseServer();
+
+  const {
+    error,
+  } = await supabase
+    .storage
+    .from('riddles')
+    .remove([
+      filename,
+    ]);
+
+  if (error) {
+    console.error(
+      'Erro ao remover imagem do enigma:',
+      error,
+    );
+  }
 }
 
 function revalidateRiddlePages() {
+  revalidatePath('/');
   revalidatePath('/enigmas');
-  revalidatePath('/admin/enigmas');
+  revalidatePath(
+    '/admin/enigmas',
+  );
 }
 
 export async function addRiddleAction(
   formData: FormData,
 ) {
-  // Proteção real da ação
-  await requireAdminAction('riddles');
+  await requireAdminAction(
+    'riddles',
+  );
 
   const title =
     formData
@@ -168,17 +244,19 @@ export async function addRiddleAction(
     );
 
   const url =
-    normalizeExternalUrl(rawUrl);
+    normalizeExternalUrl(
+      rawUrl,
+    );
 
-  const imageFile =
-    formData.get('image') as File | null;
+  const imageValue =
+    formData.get(
+      'image',
+    );
 
   if (!title) {
     return;
   }
 
-  // Para exibir o botão,
-  // nome e link precisam existir.
   const finalButtonText =
     buttonText && url
       ? buttonText
@@ -195,11 +273,13 @@ export async function addRiddleAction(
 
   try {
     if (
-      imageFile &&
-      imageFile.size > 0
+      imageValue instanceof File &&
+      imageValue.size > 0
     ) {
       imagePath =
-        await saveImage(imageFile);
+        await saveImage(
+          imageValue,
+        );
     }
 
     const riddles =
@@ -214,10 +294,13 @@ export async function addRiddleAction(
         finalButtonText,
       url: finalUrl,
       createdAt:
-        new Date().toISOString(),
+        new Date()
+          .toISOString(),
     });
 
-    await saveRiddles(riddles);
+    await saveRiddles(
+      riddles,
+    );
 
     await addLog(
       'Enigma adicionado',
@@ -226,9 +309,13 @@ export async function addRiddleAction(
 
     revalidateRiddlePages();
   } catch (error) {
-    await deleteImage(imagePath);
+    if (imagePath) {
+      await deleteImage(
+        imagePath,
+      );
+    }
 
-    console.warn(
+    console.error(
       'Erro ao adicionar enigma:',
       error,
     );
@@ -238,8 +325,9 @@ export async function addRiddleAction(
 export async function updateRiddleAction(
   formData: FormData,
 ) {
-  // Proteção real da ação
-  await requireAdminAction('riddles');
+  await requireAdminAction(
+    'riddles',
+  );
 
   const id =
     formData
@@ -272,14 +360,19 @@ export async function updateRiddleAction(
     );
 
   const url =
-    normalizeExternalUrl(rawUrl);
+    normalizeExternalUrl(
+      rawUrl,
+    );
 
-  const imageFile =
-    formData.get('image') as File | null;
+  const imageValue =
+    formData.get(
+      'image',
+    );
 
   const removeImage =
-    formData.get('removeImage') ===
-    'on';
+    formData.get(
+      'removeImage',
+    ) === 'on';
 
   if (!id || !title) {
     return;
@@ -294,7 +387,9 @@ export async function updateRiddleAction(
         riddle.id === id,
     );
 
-  if (targetIndex === -1) {
+  if (
+    targetIndex === -1
+  ) {
     return;
   }
 
@@ -317,16 +412,17 @@ export async function updateRiddleAction(
         nextImage,
       );
 
-      nextImage = undefined;
+      nextImage =
+        undefined;
     }
 
     if (
-      imageFile &&
-      imageFile.size > 0
+      imageValue instanceof File &&
+      imageValue.size > 0
     ) {
       uploadedImage =
         await saveImage(
-          imageFile,
+          imageValue,
         );
 
       if (nextImage) {
@@ -353,10 +449,12 @@ export async function updateRiddleAction(
       ...currentRiddle,
       title,
       clue,
-      image: nextImage,
+      image:
+        nextImage,
       buttonText:
         finalButtonText,
-      url: finalUrl,
+      url:
+        finalUrl,
     };
 
     await saveRiddles(
@@ -380,7 +478,7 @@ export async function updateRiddleAction(
       );
     }
 
-    console.warn(
+    console.error(
       'Erro ao editar enigma:',
       error,
     );
@@ -390,8 +488,9 @@ export async function updateRiddleAction(
 export async function deleteRiddleAction(
   formData: FormData,
 ) {
-  // Proteção real da ação
-  await requireAdminAction('riddles');
+  await requireAdminAction(
+    'riddles',
+  );
 
   const id =
     formData

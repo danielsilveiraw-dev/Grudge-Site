@@ -1,7 +1,5 @@
 'use server';
 
-import fs from 'fs/promises';
-import path from 'path';
 import { randomUUID } from 'crypto';
 import { revalidatePath } from 'next/cache';
 
@@ -12,6 +10,139 @@ import {
 
 import { addLog } from '@/lib/logs';
 import { requireAdminAction } from '@/lib/admin-access';
+import { getSupabaseServer } from '@/lib/supabase-server';
+
+const IMAGE_EXTENSIONS = new Set([
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.webp',
+  '.gif',
+]);
+
+function getExtension(filename: string) {
+  const index = filename.lastIndexOf('.');
+
+  if (index === -1) {
+    return null;
+  }
+
+  const extension = filename
+    .slice(index)
+    .toLowerCase();
+
+  if (!IMAGE_EXTENSIONS.has(extension)) {
+    return null;
+  }
+
+  return extension;
+}
+
+async function saveImage(
+  file: File,
+): Promise<string> {
+  const extension =
+    getExtension(file.name);
+
+  if (!extension) {
+    throw new Error(
+      'Formato de imagem inválido.',
+    );
+  }
+
+  const filename =
+    `${randomUUID()}${extension}`;
+
+  const bytes = Buffer.from(
+    await file.arrayBuffer(),
+  );
+
+  const supabase =
+    getSupabaseServer();
+
+  const {
+    error: uploadError,
+  } = await supabase
+    .storage
+    .from('events')
+    .upload(
+      filename,
+      bytes,
+      {
+        contentType:
+          file.type ||
+          'application/octet-stream',
+        upsert: false,
+      },
+    );
+
+  if (uploadError) {
+    console.error(
+      'Erro ao enviar imagem do evento:',
+      uploadError,
+    );
+
+    throw uploadError;
+  }
+
+  const {
+    data: publicUrlData,
+  } = supabase
+    .storage
+    .from('events')
+    .getPublicUrl(filename);
+
+  return publicUrlData.publicUrl;
+}
+
+async function deleteImage(
+  publicUrl?: string,
+) {
+  if (!publicUrl) {
+    return;
+  }
+
+  // Não tenta apagar imagens antigas locais.
+  if (
+    !publicUrl.startsWith('http://') &&
+    !publicUrl.startsWith('https://')
+  ) {
+    return;
+  }
+
+  const filename =
+    publicUrl
+      .split('?')[0]
+      .split('/')
+      .pop();
+
+  if (!filename) {
+    return;
+  }
+
+  const supabase =
+    getSupabaseServer();
+
+  const {
+    error,
+  } = await supabase
+    .storage
+    .from('events')
+    .remove([filename]);
+
+  if (error) {
+    console.error(
+      'Erro ao remover imagem do evento:',
+      error,
+    );
+  }
+}
+
+function revalidateEventPages() {
+  revalidatePath('/');
+  revalidatePath('/calendario');
+  revalidatePath('/admin/calendario');
+}
 
 export async function addEventAction(
   formData: FormData,
@@ -36,78 +167,60 @@ export async function addEventAction(
       ?.toString()
       .trim() ?? '';
 
-  const file =
-    formData.get('image') as File | null;
+  const imageValue =
+    formData.get('image');
 
   if (!title || !date) {
     return;
   }
 
-  let imagePath: string | undefined;
+  let imagePath:
+    | string
+    | undefined;
 
-  if (
-    file &&
-    file.size > 0 &&
-    file.name
-  ) {
-    const bytes = Buffer.from(
-      await file.arrayBuffer(),
+  try {
+    if (
+      imageValue instanceof File &&
+      imageValue.size > 0
+    ) {
+      imagePath =
+        await saveImage(
+          imageValue,
+        );
+    }
+
+    const events =
+      await getEvents();
+
+    events.push({
+      id: randomUUID(),
+      title,
+      date,
+      description:
+        description || undefined,
+      image: imagePath,
+    });
+
+    await saveEvents(events);
+
+    await addLog(
+      'Evento adicionado',
+      title,
     );
 
-    const extension =
-      path.extname(file.name).toLowerCase() ||
-      '.jpg';
-
-    const filename =
-      `${randomUUID()}${extension}`;
-
-    const uploadDirectory = path.join(
-      process.cwd(),
-      'public',
-      'uploads',
-      'events',
+    revalidateEventPages();
+  } catch (error) {
+    console.error(
+      'Erro ao adicionar evento:',
+      error,
     );
 
-    await fs.mkdir(
-      uploadDirectory,
-      {
-        recursive: true,
-      },
-    );
-
-    await fs.writeFile(
-      path.join(
-        uploadDirectory,
-        filename,
-      ),
-      bytes,
-    );
-
-    imagePath =
-      `/uploads/events/${filename}`;
+    if (imagePath) {
+      await deleteImage(
+        imagePath,
+      );
+    }
   }
-
-  const events = await getEvents();
-
-  events.push({
-    id: randomUUID(),
-    title,
-    date,
-    description:
-      description || undefined,
-    image: imagePath,
-  });
-
-  await saveEvents(events);
-
-  await addLog(
-    'Evento adicionado',
-    title,
-  );
-
-  revalidatePath('/');
-  revalidatePath('/calendario');
-  revalidatePath('/admin/calendario');
 }
 
 export async function deleteEventAction(
@@ -125,7 +238,8 @@ export async function deleteEventAction(
     return;
   }
 
-  const events = await getEvents();
+  const events =
+    await getEvents();
 
   const target =
     events.find(
@@ -137,23 +251,9 @@ export async function deleteEventAction(
     return;
   }
 
-  if (target.image) {
-    const normalizedPath =
-      target.image.replace(
-        /^\/+/,
-        '',
-      );
-
-    const filePath = path.join(
-      process.cwd(),
-      'public',
-      normalizedPath,
-    );
-
-    await fs
-      .unlink(filePath)
-      .catch(() => {});
-  }
+  await deleteImage(
+    target.image,
+  );
 
   await saveEvents(
     events.filter(
@@ -167,7 +267,5 @@ export async function deleteEventAction(
     target.title,
   );
 
-  revalidatePath('/');
-  revalidatePath('/calendario');
-  revalidatePath('/admin/calendario');
+  revalidateEventPages();
 }

@@ -1,13 +1,12 @@
 'use server';
 
-import fs from 'fs/promises';
-import path from 'path';
 import { randomUUID } from 'crypto';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
 import { addLog } from '@/lib/logs';
 import { requireAdminAction } from '@/lib/admin-access';
+import { getSupabaseServer } from '@/lib/supabase-server';
 
 import {
   getSongs,
@@ -37,9 +36,17 @@ function safeExtension(
   filename: string,
   allowed: Set<string>,
 ) {
-  const extension = path
-    .extname(filename)
-    .toLowerCase();
+  const index =
+    filename.lastIndexOf('.');
+
+  if (index === -1) {
+    return null;
+  }
+
+  const extension =
+    filename
+      .slice(index)
+      .toLowerCase();
 
   if (!allowed.has(extension)) {
     return null;
@@ -51,25 +58,38 @@ function safeExtension(
 function getSelectedPages(
   formData: FormData,
 ): SitePage[] {
-  const selectedPages = formData
-    .getAll('pages')
-    .map((value) => value.toString())
-    .filter((page): page is SitePage =>
-      SITE_PAGES.includes(page as SitePage),
-    );
+  const selectedPages =
+    formData
+      .getAll('pages')
+      .map((value) =>
+        value.toString(),
+      )
+      .filter(
+        (
+          page,
+        ): page is SitePage =>
+          SITE_PAGES.includes(
+            page as SitePage,
+          ),
+      );
 
-  return [...new Set(selectedPages)];
+  return [
+    ...new Set(
+      selectedPages,
+    ),
+  ];
 }
 
 async function saveUpload(
   file: File,
-  folder: string,
+  bucket: 'music-audio' | 'music-covers',
   allowedExtensions: Set<string>,
 ) {
-  const extension = safeExtension(
-    file.name,
-    allowedExtensions,
-  );
+  const extension =
+    safeExtension(
+      file.name,
+      allowedExtensions,
+    );
 
   if (!extension) {
     throw new Error(
@@ -77,52 +97,109 @@ async function saveUpload(
     );
   }
 
-  const bytes = Buffer.from(
-    await file.arrayBuffer(),
-  );
-
   const filename =
     `${randomUUID()}${extension}`;
 
-  const uploadDirectory = path.join(
-    process.cwd(),
-    'public',
-    'uploads',
-    'music',
-    folder,
-  );
+  const bytes =
+    Buffer.from(
+      await file.arrayBuffer(),
+    );
 
-  await fs.mkdir(uploadDirectory, {
-    recursive: true,
-  });
+  const supabase =
+    getSupabaseServer();
 
-  await fs.writeFile(
-    path.join(uploadDirectory, filename),
-    bytes,
-  );
+  const {
+    error: uploadError,
+  } = await supabase
+    .storage
+    .from(bucket)
+    .upload(
+      filename,
+      bytes,
+      {
+        contentType:
+          file.type ||
+          'application/octet-stream',
+        upsert: false,
+      },
+    );
 
-  return `/uploads/music/${folder}/${filename}`;
+  if (uploadError) {
+    console.error(
+      `Erro ao enviar arquivo para ${bucket}:`,
+      uploadError,
+    );
+
+    throw uploadError;
+  }
+
+  const {
+    data: publicUrlData,
+  } = supabase
+    .storage
+    .from(bucket)
+    .getPublicUrl(
+      filename,
+    );
+
+  return publicUrlData.publicUrl;
 }
 
-async function deletePublicFile(
-  publicPath?: string,
+async function deleteStorageFile(
+  publicUrl:
+    | string
+    | undefined,
+  bucket:
+    | 'music-audio'
+    | 'music-covers',
 ) {
-  if (!publicPath) {
+  if (!publicUrl) {
     return;
   }
 
-  const normalizedPath =
-    publicPath.replace(/^\/+/, '');
+  /*
+   * Ignora arquivos antigos que ainda
+   * estejam como /uploads/music/...
+   */
+  if (
+    !publicUrl.startsWith(
+      'http://',
+    ) &&
+    !publicUrl.startsWith(
+      'https://',
+    )
+  ) {
+    return;
+  }
 
-  const filePath = path.join(
-    process.cwd(),
-    'public',
-    normalizedPath,
-  );
+  const filename =
+    publicUrl
+      .split('?')[0]
+      .split('/')
+      .pop();
 
-  await fs
-    .unlink(filePath)
-    .catch(() => {});
+  if (!filename) {
+    return;
+  }
+
+  const supabase =
+    getSupabaseServer();
+
+  const {
+    error,
+  } = await supabase
+    .storage
+    .from(bucket)
+    .remove([
+      filename,
+    ]);
+
+  if (error) {
+    console.error(
+      `Erro ao remover arquivo de ${bucket}:`,
+      error,
+    );
+  }
 }
 
 function revalidateMusicPages() {
@@ -136,8 +213,9 @@ function revalidateMusicPages() {
 export async function addSongAction(
   formData: FormData,
 ) {
-  // Proteção real da ação
-  await requireAdminAction('music');
+  await requireAdminAction(
+    'music',
+  );
 
   const name =
     formData
@@ -145,24 +223,28 @@ export async function addSongAction(
       ?.toString()
       .trim() ?? '';
 
-  const audioFile =
-    formData.get('audio') as File | null;
+  const audioValue =
+    formData.get('audio');
 
-  const coverFile =
-    formData.get('cover') as File | null;
+  const coverValue =
+    formData.get('cover');
 
   const pages =
-    getSelectedPages(formData);
+    getSelectedPages(
+      formData,
+    );
 
   if (
     !name ||
-    !audioFile ||
-    audioFile.size === 0
+    !(audioValue instanceof File) ||
+    audioValue.size === 0
   ) {
     return;
   }
 
-  if (pages.length === 0) {
+  if (
+    pages.length === 0
+  ) {
     return;
   }
 
@@ -175,21 +257,23 @@ export async function addSongAction(
     | undefined;
 
   try {
-    audioPath = await saveUpload(
-      audioFile,
-      'audio',
-      AUDIO_EXTENSIONS,
-    );
+    audioPath =
+      await saveUpload(
+        audioValue,
+        'music-audio',
+        AUDIO_EXTENSIONS,
+      );
 
     if (
-      coverFile &&
-      coverFile.size > 0
+      coverValue instanceof File &&
+      coverValue.size > 0
     ) {
-      coverPath = await saveUpload(
-        coverFile,
-        'covers',
-        IMAGE_EXTENSIONS,
-      );
+      coverPath =
+        await saveUpload(
+          coverValue,
+          'music-covers',
+          IMAGE_EXTENSIONS,
+        );
     }
 
     const songs =
@@ -198,14 +282,19 @@ export async function addSongAction(
     songs.push({
       id: randomUUID(),
       name,
-      audio: audioPath,
-      cover: coverPath,
+      audio:
+        audioPath,
+      cover:
+        coverPath,
       pages,
       createdAt:
-        new Date().toISOString(),
+        new Date()
+          .toISOString(),
     });
 
-    await saveSongs(songs);
+    await saveSongs(
+      songs,
+    );
 
     await addLog(
       'Música adicionada',
@@ -214,15 +303,19 @@ export async function addSongAction(
 
     revalidateMusicPages();
   } catch (error) {
-    await deletePublicFile(
-      audioPath,
-    );
+    await Promise.all([
+      deleteStorageFile(
+        audioPath,
+        'music-audio',
+      ),
 
-    await deletePublicFile(
-      coverPath,
-    );
+      deleteStorageFile(
+        coverPath,
+        'music-covers',
+      ),
+    ]);
 
-    console.warn(
+    console.error(
       'Erro ao adicionar música:',
       error,
     );
@@ -232,16 +325,20 @@ export async function addSongAction(
 export async function updateSongPagesAction(
   formData: FormData,
 ) {
-  // Proteção real da ação
-  await requireAdminAction('music');
+  await requireAdminAction(
+    'music',
+  );
 
   const id =
     formData
       .get('id')
-      ?.toString() ?? '';
+      ?.toString()
+      .trim() ?? '';
 
   const pages =
-    getSelectedPages(formData);
+    getSelectedPages(
+      formData,
+    );
 
   if (!id) {
     console.warn(
@@ -251,7 +348,9 @@ export async function updateSongPagesAction(
     return;
   }
 
-  if (pages.length === 0) {
+  if (
+    pages.length === 0
+  ) {
     console.warn(
       'Selecione pelo menos uma página para a música.',
     );
@@ -268,7 +367,9 @@ export async function updateSongPagesAction(
         song.id === id,
     );
 
-  if (targetIndex === -1) {
+  if (
+    targetIndex === -1
+  ) {
     console.warn(
       'Música não encontrada:',
       id,
@@ -278,11 +379,15 @@ export async function updateSongPagesAction(
   }
 
   songs[targetIndex] = {
-    ...songs[targetIndex],
+    ...songs[
+      targetIndex
+    ],
     pages,
   };
 
-  await saveSongs(songs);
+  await saveSongs(
+    songs,
+  );
 
   await addLog(
     'Páginas da música alteradas',
@@ -291,19 +396,23 @@ export async function updateSongPagesAction(
 
   revalidateMusicPages();
 
-  redirect('/admin/musicas');
+  redirect(
+    '/admin/musicas',
+  );
 }
 
 export async function deleteSongAction(
   formData: FormData,
 ) {
-  // Proteção real da ação
-  await requireAdminAction('music');
+  await requireAdminAction(
+    'music',
+  );
 
   const id =
     formData
       .get('id')
-      ?.toString();
+      ?.toString()
+      .trim() ?? '';
 
   if (!id) {
     return;
@@ -323,11 +432,14 @@ export async function deleteSongAction(
   }
 
   await Promise.all([
-    deletePublicFile(
+    deleteStorageFile(
       target.audio,
+      'music-audio',
     ),
-    deletePublicFile(
+
+    deleteStorageFile(
       target.cover,
+      'music-covers',
     ),
   ]);
 
