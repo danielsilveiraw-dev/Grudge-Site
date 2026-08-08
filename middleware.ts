@@ -3,24 +3,39 @@ import { NextResponse } from 'next/server';
 
 export default auth((request) => {
   const { pathname } = request.nextUrl;
-  const isLoggedIn = Boolean(request.auth?.user);
 
-  const isLoginPage = pathname === '/admin/login';
-  const isAdminPage = pathname.startsWith('/admin');
+  const isLoggedIn = Boolean(
+    request.auth?.user,
+  );
+
+  const isLoginPage =
+    pathname === '/admin/login';
+
+  const isAdminPage =
+    pathname.startsWith('/admin');
 
   if (isLoginPage) {
     if (isLoggedIn) {
       return NextResponse.redirect(
-        new URL('/admin/calendario', request.url),
+        new URL(
+          '/admin/calendario',
+          request.url,
+        ),
       );
     }
 
     return NextResponse.next();
   }
 
-  if (isAdminPage && !isLoggedIn) {
+  if (
+    isAdminPage &&
+    !isLoggedIn
+  ) {
     return NextResponse.redirect(
-      new URL('/admin/login', request.url),
+      new URL(
+        '/admin/login',
+        request.url,
+      ),
     );
   }
 
@@ -28,9 +43,7 @@ export default auth((request) => {
 });
 
 export const config = {
-  matcher: ['/admin/:path*'],
-
-  // Necessário porque auth.ts importa lib/staff.ts,
-  // que usa fs e path.
-  runtime: 'nodejs',
+  matcher: [
+    '/admin/:path*',
+  ],
 };
