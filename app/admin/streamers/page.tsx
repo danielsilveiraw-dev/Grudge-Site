@@ -1,12 +1,12 @@
 import Image from 'next/image';
 
 import AdminHeader from '../AdminHeader';
+import AdminStreamerForm from '@/components/AdminStreamerForm';
 
 import { getStreamers } from '@/lib/streamers';
 import { requireAdminPage } from '@/lib/admin-access';
 
 import {
-  addStreamerAction,
   deleteStreamerAction,
 } from './actions';
 
@@ -30,180 +30,7 @@ export default async function AdminStreamersPage() {
           novo streamer
         </h2>
 
-        <form
-          action={addStreamerAction}
-          encType="multipart/form-data"
-          className="flex flex-col gap-4"
-        >
-          <div>
-            <label
-              htmlFor="name"
-              className="mb-1.5 block text-[0.7rem] uppercase tracking-[0.12em] text-text-dim"
-            >
-              nome
-            </label>
-
-            <input
-              id="name"
-              name="name"
-              type="text"
-              required
-              autoComplete="off"
-              placeholder="nome do streamer"
-              className="w-full rounded-xl border border-line-soft bg-bg-deep/50 p-3 text-text-main focus:border-accent-hot focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor="image"
-              className="mb-1.5 block text-[0.7rem] uppercase tracking-[0.12em] text-text-dim"
-            >
-              foto
-            </label>
-
-            <input
-              id="image"
-              name="image"
-              type="file"
-              required
-              accept=".jpg,.jpeg,.png,.webp,.gif,image/jpeg,image/png,image/webp,image/gif"
-              className="w-full rounded-xl border border-line-soft bg-bg-deep/50 p-2.5 text-[0.85rem] text-text-dim file:mr-3 file:rounded-lg file:border-0 file:bg-accent-hot file:px-3 file:py-1.5 file:text-[0.75rem] file:font-bold file:text-bg-deep"
-            />
-
-            <p className="mt-1.5 text-[0.68rem] text-text-dim">
-              formatos aceitos: JPG, PNG, WEBP e GIF
-            </p>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label
-                htmlFor="instagram"
-                className="mb-1.5 block text-[0.7rem] uppercase tracking-[0.12em] text-text-dim"
-              >
-                Instagram
-              </label>
-
-              <input
-                id="instagram"
-                name="instagram"
-                type="url"
-                placeholder="https://instagram.com/..."
-                className="w-full rounded-xl border border-line-soft bg-bg-deep/50 p-3 text-text-main focus:border-accent-hot focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="youtube"
-                className="mb-1.5 block text-[0.7rem] uppercase tracking-[0.12em] text-text-dim"
-              >
-                YouTube
-              </label>
-
-              <input
-                id="youtube"
-                name="youtube"
-                type="url"
-                placeholder="https://youtube.com/..."
-                className="w-full rounded-xl border border-line-soft bg-bg-deep/50 p-3 text-text-main focus:border-accent-hot focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="twitch"
-                className="mb-1.5 block text-[0.7rem] uppercase tracking-[0.12em] text-text-dim"
-              >
-                Twitch
-              </label>
-
-              <input
-                id="twitch"
-                name="twitch"
-                type="url"
-                placeholder="https://twitch.tv/..."
-                className="w-full rounded-xl border border-line-soft bg-bg-deep/50 p-3 text-text-main focus:border-accent-hot focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="kick"
-                className="mb-1.5 block text-[0.7rem] uppercase tracking-[0.12em] text-text-dim"
-              >
-                Kick
-              </label>
-
-              <input
-                id="kick"
-                name="kick"
-                type="url"
-                placeholder="https://kick.com/..."
-                className="w-full rounded-xl border border-line-soft bg-bg-deep/50 p-3 text-text-main focus:border-accent-hot focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="tiktok"
-                className="mb-1.5 block text-[0.7rem] uppercase tracking-[0.12em] text-text-dim"
-              >
-                TikTok
-              </label>
-
-              <input
-                id="tiktok"
-                name="tiktok"
-                type="url"
-                placeholder="https://tiktok.com/@..."
-                className="w-full rounded-xl border border-line-soft bg-bg-deep/50 p-3 text-text-main focus:border-accent-hot focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="x"
-                className="mb-1.5 block text-[0.7rem] uppercase tracking-[0.12em] text-text-dim"
-              >
-                X / Twitter
-              </label>
-
-              <input
-                id="x"
-                name="x"
-                type="url"
-                placeholder="https://x.com/..."
-                className="w-full rounded-xl border border-line-soft bg-bg-deep/50 p-3 text-text-main focus:border-accent-hot focus:outline-none"
-              />
-            </div>
-
-            <div className="sm:col-span-2">
-              <label
-                htmlFor="discord"
-                className="mb-1.5 block text-[0.7rem] uppercase tracking-[0.12em] text-text-dim"
-              >
-                Discord
-              </label>
-
-              <input
-                id="discord"
-                name="discord"
-                type="url"
-                placeholder="https://discord.gg/..."
-                className="w-full rounded-xl border border-line-soft bg-bg-deep/50 p-3 text-text-main focus:border-accent-hot focus:outline-none"
-              />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            className="mt-1 rounded-xl bg-accent-hot px-4 py-3 font-bold text-bg-deep transition hover:brightness-110"
-          >
-            adicionar streamer
-          </button>
-        </form>
+        <AdminStreamerForm />
       </section>
 
       <section>
@@ -247,7 +74,9 @@ export default async function AdminStreamersPage() {
                       cadastrado em{' '}
                       {new Date(
                         streamer.createdAt,
-                      ).toLocaleDateString('pt-BR')}
+                      ).toLocaleDateString(
+                        'pt-BR',
+                      )}
                     </p>
                   )}
 
