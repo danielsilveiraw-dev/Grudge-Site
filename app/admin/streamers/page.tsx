@@ -11,18 +11,18 @@ import {
 } from './actions';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default async function AdminStreamersPage() {
-  // Proteção real da página de streamers
   await requireAdminPage('streamers');
 
   const streamers = await getStreamers();
 
   return (
-    <main className="relative z-[1] mx-auto max-w-[820px] px-6 pb-20 pt-[120px]">
+    <main className="relative z-[1] mx-auto max-w-[900px] px-6 pb-28 pt-[120px]">
       <AdminHeader
         title="gerenciar streamers"
-        subtitle="adicione streamers e suas redes sociais"
+        subtitle="adicione e remova streamers do site"
       />
 
       <section className="mb-10 rounded-[20px] border border-line-soft bg-bg-mid/30 p-7 backdrop-blur-sm">
@@ -32,6 +32,7 @@ export default async function AdminStreamersPage() {
 
         <form
           action={addStreamerAction}
+          encType="multipart/form-data"
           className="flex flex-col gap-4"
         >
           <div>
@@ -47,6 +48,7 @@ export default async function AdminStreamersPage() {
               name="name"
               type="text"
               required
+              autoComplete="off"
               placeholder="nome do streamer"
               className="w-full rounded-xl border border-line-soft bg-bg-deep/50 p-3 text-text-main focus:border-accent-hot focus:outline-none"
             />
@@ -65,9 +67,13 @@ export default async function AdminStreamersPage() {
               name="image"
               type="file"
               required
-              accept="image/*"
+              accept=".jpg,.jpeg,.png,.webp,.gif,image/jpeg,image/png,image/webp,image/gif"
               className="w-full rounded-xl border border-line-soft bg-bg-deep/50 p-2.5 text-[0.85rem] text-text-dim file:mr-3 file:rounded-lg file:border-0 file:bg-accent-hot file:px-3 file:py-1.5 file:text-[0.75rem] file:font-bold file:text-bg-deep"
             />
+
+            <p className="mt-1.5 text-[0.68rem] text-text-dim">
+              formatos aceitos: JPG, PNG, WEBP e GIF
+            </p>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -139,7 +145,7 @@ export default async function AdminStreamersPage() {
               />
             </div>
 
-            <div className="sm:col-span-2">
+            <div>
               <label
                 htmlFor="tiktok"
                 className="mb-1.5 block text-[0.7rem] uppercase tracking-[0.12em] text-text-dim"
@@ -152,6 +158,40 @@ export default async function AdminStreamersPage() {
                 name="tiktok"
                 type="url"
                 placeholder="https://tiktok.com/@..."
+                className="w-full rounded-xl border border-line-soft bg-bg-deep/50 p-3 text-text-main focus:border-accent-hot focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="x"
+                className="mb-1.5 block text-[0.7rem] uppercase tracking-[0.12em] text-text-dim"
+              >
+                X / Twitter
+              </label>
+
+              <input
+                id="x"
+                name="x"
+                type="url"
+                placeholder="https://x.com/..."
+                className="w-full rounded-xl border border-line-soft bg-bg-deep/50 p-3 text-text-main focus:border-accent-hot focus:outline-none"
+              />
+            </div>
+
+            <div className="sm:col-span-2">
+              <label
+                htmlFor="discord"
+                className="mb-1.5 block text-[0.7rem] uppercase tracking-[0.12em] text-text-dim"
+              >
+                Discord
+              </label>
+
+              <input
+                id="discord"
+                name="discord"
+                type="url"
+                placeholder="https://discord.gg/..."
                 className="w-full rounded-xl border border-line-soft bg-bg-deep/50 p-3 text-text-main focus:border-accent-hot focus:outline-none"
               />
             </div>
@@ -182,25 +222,34 @@ export default async function AdminStreamersPage() {
                 key={streamer.id}
                 className="flex items-center gap-4 rounded-xl border border-line-soft bg-bg-deep/40 p-4"
               >
-                <Image
-                  src={streamer.image}
-                  alt={streamer.name}
-                  width={70}
-                  height={70}
-                  className="h-[70px] w-[70px] flex-shrink-0 rounded-xl object-cover"
-                />
+                {streamer.image ? (
+                  <Image
+                    src={streamer.image}
+                    alt={streamer.name}
+                    width={70}
+                    height={70}
+                    unoptimized
+                    className="h-[70px] w-[70px] flex-shrink-0 rounded-xl object-cover"
+                  />
+                ) : (
+                  <div className="flex h-[70px] w-[70px] flex-shrink-0 items-center justify-center rounded-xl border border-line-soft bg-bg-mid/60 text-xl text-text-dim">
+                    ?
+                  </div>
+                )}
 
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-display text-lg text-text-main">
                     {streamer.name}
                   </p>
 
-                  <p className="mt-1 text-[0.7rem] text-text-dim">
-                    cadastrado em{' '}
-                    {new Date(
-                      streamer.createdAt,
-                    ).toLocaleDateString('pt-BR')}
-                  </p>
+                  {streamer.createdAt && (
+                    <p className="mt-1 text-[0.7rem] text-text-dim">
+                      cadastrado em{' '}
+                      {new Date(
+                        streamer.createdAt,
+                      ).toLocaleDateString('pt-BR')}
+                    </p>
+                  )}
 
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {streamer.instagram && (
@@ -230,6 +279,18 @@ export default async function AdminStreamersPage() {
                     {streamer.tiktok && (
                       <span className="rounded-full border border-line-soft px-2 py-1 text-[0.65rem] text-text-dim">
                         TikTok
+                      </span>
+                    )}
+
+                    {streamer.x && (
+                      <span className="rounded-full border border-line-soft px-2 py-1 text-[0.65rem] text-text-dim">
+                        X
+                      </span>
+                    )}
+
+                    {streamer.discord && (
+                      <span className="rounded-full border border-line-soft px-2 py-1 text-[0.65rem] text-text-dim">
+                        Discord
                       </span>
                     )}
                   </div>
