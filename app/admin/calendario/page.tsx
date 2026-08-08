@@ -10,8 +10,9 @@ import {
 
 import AdminHeader from '../AdminHeader';
 
+export const dynamic = 'force-dynamic';
+
 export default async function AdminCalendarioPage() {
-  // 🔒 Proteção real da página
   await requireAdminPage('calendar');
 
   const events = await getEvents();
@@ -30,6 +31,7 @@ export default async function AdminCalendarioPage() {
 
         <form
           action={addEventAction}
+          encType="multipart/form-data"
           className="flex flex-col gap-4"
         >
           <div>
@@ -96,7 +98,7 @@ export default async function AdminCalendarioPage() {
               id="image"
               name="image"
               type="file"
-              accept="image/*"
+              accept=".jpg,.jpeg,.png,.webp,.gif,image/jpeg,image/png,image/webp,image/gif"
               className="w-full rounded-xl border border-line-soft bg-bg-deep/50 p-2.5 text-[0.85rem] text-text-dim file:mr-3 file:rounded-lg file:border-0 file:bg-accent-hot file:px-3 file:py-1.5 file:text-[0.75rem] file:font-bold file:text-bg-deep"
             />
           </div>
@@ -145,7 +147,7 @@ export default async function AdminCalendarioPage() {
 
                   <p className="text-[0.75rem] text-text-dim">
                     {new Date(
-                      event.date + 'T00:00:00',
+                      `${event.date}T00:00:00`,
                     ).toLocaleDateString('pt-BR')}
                   </p>
 

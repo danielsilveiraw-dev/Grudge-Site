@@ -1,5 +1,4 @@
-import fs from 'fs/promises';
-import path from 'path';
+import { supabaseServer } from './supabase-server';
 
 export type Streamer = {
   id: string;
@@ -15,37 +14,28 @@ export type Streamer = {
   createdAt: string;
 };
 
-const DATA_FILE = path.join(
-  process.cwd(),
-  'data',
-  'streamers.json',
-);
-
 export async function getStreamers(): Promise<Streamer[]> {
-  try {
-    const raw = await fs.readFile(DATA_FILE, 'utf8');
-    const parsed = JSON.parse(raw);
+  const { data, error } = await supabaseServer
+    .from('streamers')
+    .select('*')
+    .order('created_at', { ascending: false });
 
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed;
-  } catch {
+  if (error) {
+    console.error('Erro ao buscar streamers:', error);
     return [];
   }
-}
 
-export async function saveStreamers(
-  streamers: Streamer[],
-): Promise<void> {
-  await fs.mkdir(path.dirname(DATA_FILE), {
-    recursive: true,
-  });
-
-  await fs.writeFile(
-    DATA_FILE,
-    JSON.stringify(streamers, null, 2),
-    'utf8',
-  );
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    name: row.name,
+    image: row.image,
+    instagram: row.instagram,
+    discord: row.discord,
+    youtube: row.youtube,
+    twitch: row.twitch,
+    kick: row.kick,
+    tiktok: row.tiktok,
+    x: row.x,
+    createdAt: row.created_at,
+  }));
 }

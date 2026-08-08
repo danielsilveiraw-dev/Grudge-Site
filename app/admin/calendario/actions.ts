@@ -5,22 +5,36 @@ import path from 'path';
 import { randomUUID } from 'crypto';
 import { revalidatePath } from 'next/cache';
 
-import { getEvents, saveEvents } from '@/lib/events';
+import {
+  getEvents,
+  saveEvents,
+} from '@/lib/events';
+
 import { addLog } from '@/lib/logs';
 import { requireAdminAction } from '@/lib/admin-access';
 
-export async function addEventAction(formData: FormData) {
-  // Proteção real da ação
+export async function addEventAction(
+  formData: FormData,
+) {
   await requireAdminAction('calendar');
 
   const title =
-    formData.get('title')?.toString().trim() ?? '';
+    formData
+      .get('title')
+      ?.toString()
+      .trim() ?? '';
 
   const date =
-    formData.get('date')?.toString() ?? '';
+    formData
+      .get('date')
+      ?.toString()
+      .trim() ?? '';
 
   const description =
-    formData.get('description')?.toString().trim() ?? '';
+    formData
+      .get('description')
+      ?.toString()
+      .trim() ?? '';
 
   const file =
     formData.get('image') as File | null;
@@ -31,30 +45,41 @@ export async function addEventAction(formData: FormData) {
 
   let imagePath: string | undefined;
 
-  if (file && file.size > 0) {
+  if (
+    file &&
+    file.size > 0 &&
+    file.name
+  ) {
     const bytes = Buffer.from(
       await file.arrayBuffer(),
     );
 
-    const ext =
-      path.extname(file.name) || '.jpg';
+    const extension =
+      path.extname(file.name).toLowerCase() ||
+      '.jpg';
 
     const filename =
-      `${randomUUID()}${ext}`;
+      `${randomUUID()}${extension}`;
 
-    const uploadDir = path.join(
+    const uploadDirectory = path.join(
       process.cwd(),
       'public',
       'uploads',
       'events',
     );
 
-    await fs.mkdir(uploadDir, {
-      recursive: true,
-    });
+    await fs.mkdir(
+      uploadDirectory,
+      {
+        recursive: true,
+      },
+    );
 
     await fs.writeFile(
-      path.join(uploadDir, filename),
+      path.join(
+        uploadDirectory,
+        filename,
+      ),
       bytes,
     );
 
@@ -62,8 +87,7 @@ export async function addEventAction(formData: FormData) {
       `/uploads/events/${filename}`;
   }
 
-  const events =
-    await getEvents();
+  const events = await getEvents();
 
   events.push({
     id: randomUUID(),
@@ -81,6 +105,7 @@ export async function addEventAction(formData: FormData) {
     title,
   );
 
+  revalidatePath('/');
   revalidatePath('/calendario');
   revalidatePath('/admin/calendario');
 }
@@ -88,29 +113,41 @@ export async function addEventAction(formData: FormData) {
 export async function deleteEventAction(
   formData: FormData,
 ) {
-  // Proteção real da ação
   await requireAdminAction('calendar');
 
   const id =
-    formData.get('id')?.toString();
+    formData
+      .get('id')
+      ?.toString()
+      .trim() ?? '';
 
   if (!id) {
     return;
   }
 
-  const events =
-    await getEvents();
+  const events = await getEvents();
 
   const target =
     events.find(
-      (event) => event.id === id,
+      (event) =>
+        event.id === id,
     );
 
-  if (target?.image) {
+  if (!target) {
+    return;
+  }
+
+  if (target.image) {
+    const normalizedPath =
+      target.image.replace(
+        /^\/+/,
+        '',
+      );
+
     const filePath = path.join(
       process.cwd(),
       'public',
-      target.image,
+      normalizedPath,
     );
 
     await fs
@@ -120,15 +157,17 @@ export async function deleteEventAction(
 
   await saveEvents(
     events.filter(
-      (event) => event.id !== id,
+      (event) =>
+        event.id !== id,
     ),
   );
 
   await addLog(
     'Evento removido',
-    target?.title,
+    target.title,
   );
 
+  revalidatePath('/');
   revalidatePath('/calendario');
   revalidatePath('/admin/calendario');
 }
