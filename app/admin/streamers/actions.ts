@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 
 import { addLog } from '@/lib/logs';
 import { requireAdminAction } from '@/lib/admin-access';
-import { supabaseServer } from '@/lib/supabase-server';
+import { getSupabaseServer } from '@/lib/supabase-server';
 import { getStreamers } from '@/lib/streamers';
 
 const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif']);
@@ -23,13 +23,13 @@ async function saveImage(file: File) {
   const bytes = Buffer.from(await file.arrayBuffer());
   const filename = `${randomUUID()}${extension}`;
 
-  const { error } = await supabaseServer.storage
-    .from('streamers')
+  const { error } = await getSupabaseServer()
+    .storage.from('streamers')
     .upload(filename, bytes, { contentType: file.type });
 
   if (error) throw error;
 
-  const { data } = supabaseServer.storage.from('streamers').getPublicUrl(filename);
+  const { data } = getSupabaseServer().storage.from('streamers').getPublicUrl(filename);
   return data.publicUrl;
 }
 
@@ -37,7 +37,7 @@ async function deleteImage(publicUrl?: string) {
   if (!publicUrl) return;
   const filename = publicUrl.split('/').pop();
   if (!filename) return;
-  await supabaseServer.storage.from('streamers').remove([filename]);
+  await getSupabaseServer().storage.from('streamers').remove([filename]);
 }
 
 function revalidateStreamerPages() {
@@ -58,7 +58,7 @@ export async function addStreamerAction(formData: FormData) {
   try {
     imagePath = await saveImage(image);
 
-    const { error } = await supabaseServer.from('streamers').insert({
+    const { error } = await getSupabaseServer().from('streamers').insert({
       name,
       image: imagePath,
       instagram: formData.get('instagram')?.toString().trim() ?? '',
@@ -91,7 +91,7 @@ export async function deleteStreamerAction(formData: FormData) {
   if (!target) return;
 
   await deleteImage(target.image);
-  await supabaseServer.from('streamers').delete().eq('id', id);
+  await getSupabaseServer().from('streamers').delete().eq('id', id);
 
   await addLog('Streamer removido', target.name);
   revalidateStreamerPages();

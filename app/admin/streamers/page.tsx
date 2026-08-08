@@ -10,6 +10,8 @@ import {
   deleteStreamerAction,
 } from './actions';
 
+export const dynamic = 'force-dynamic';
+
 export default async function AdminStreamersPage() {
   // Proteção real da página de streamers
   await requireAdminPage('streamers');

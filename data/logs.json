@@ -303,5 +303,17 @@
     "timestamp": "2026-08-08T14:38:00.570Z",
     "action": "Streamer adicionado",
     "details": "FATE CUSTOMS"
+  },
+  {
+    "id": "75697ffb-b870-494e-b6a6-481cb7fe03d4",
+    "timestamp": "2026-08-08T15:42:51.351Z",
+    "action": "Streamer adicionado",
+    "details": "Teste  de Site"
+  },
+  {
+    "id": "1cb1cc3f-e901-4e6a-9572-ff8ed729d13a",
+    "timestamp": "2026-08-08T15:42:54.017Z",
+    "action": "Streamer removido",
+    "details": "FATE CUSTOMS"
   }
 ]

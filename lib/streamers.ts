@@ -1,4 +1,4 @@
-import { supabaseServer } from './supabase-server';
+import { getSupabaseServer } from './supabase-server';
 
 export type Streamer = {
   id: string;
@@ -15,7 +15,7 @@ export type Streamer = {
 };
 
 export async function getStreamers(): Promise<Streamer[]> {
-  const { data, error } = await supabaseServer
+  const { data, error } = await getSupabaseServer()
     .from('streamers')
     .select('*')
     .order('created_at', { ascending: false });
