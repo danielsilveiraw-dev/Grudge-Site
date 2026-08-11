@@ -1,5 +1,4 @@
-import fs from 'fs/promises';
-import path from 'path';
+import { getSupabaseServer } from '@/lib/supabase-server';
 
 export const STAFF_PERMISSIONS = [
   'calendar',
@@ -35,12 +34,6 @@ export type StaffMember = {
   lastLoginAt?: string;
 };
 
-const STAFF_FILE = path.join(
-  process.cwd(),
-  'data',
-  'staff.json',
-);
-
 function isPermission(
   value: unknown,
 ): value is StaffPermission {
@@ -52,97 +45,47 @@ function isPermission(
   );
 }
 
+function normalizePermissions(
+  value: unknown,
+): StaffPermission[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(isPermission);
+}
+
 export async function getStaffMembers(): Promise<
   StaffMember[]
 > {
-  try {
-    const raw = await fs.readFile(
-      STAFF_FILE,
-      'utf8',
+  const supabase = getSupabaseServer();
+
+  const {
+    data,
+    error,
+  } = await supabase
+    .from('staff')
+    .select(
+      `
+        discord_id,
+        name,
+        image,
+        role,
+        permissions,
+        created_at,
+        added_by,
+        added_by_discord_id,
+        last_login_at
+      `,
+    )
+    .order(
+      'created_at',
+      {
+        ascending: true,
+      },
     );
 
-    const parsed: unknown = JSON.parse(raw);
-
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed
-      .map((item): StaffMember | null => {
-        if (
-          !item ||
-          typeof item !== 'object'
-        ) {
-          return null;
-        }
-
-        const record =
-          item as Record<string, unknown>;
-
-        const discordId = String(
-          record.discordId ?? '',
-        ).trim();
-
-        if (!discordId) {
-          return null;
-        }
-
-        const permissions = Array.isArray(
-          record.permissions,
-        )
-          ? record.permissions.filter(
-              isPermission,
-            )
-          : [];
-
-        return {
-          discordId,
-
-          name:
-            typeof record.name === 'string'
-              ? record.name
-              : undefined,
-
-          image:
-            typeof record.image === 'string'
-              ? record.image
-              : undefined,
-
-          role:
-            typeof record.role === 'string' &&
-            record.role.trim()
-              ? record.role.trim()
-              : 'Staff',
-
-          permissions,
-
-          createdAt:
-            typeof record.createdAt === 'string'
-              ? record.createdAt
-              : new Date().toISOString(),
-
-          addedBy:
-            typeof record.addedBy === 'string'
-              ? record.addedBy
-              : undefined,
-
-          addedByDiscordId:
-            typeof record.addedByDiscordId ===
-            'string'
-              ? record.addedByDiscordId
-              : undefined,
-
-          lastLoginAt:
-            typeof record.lastLoginAt === 'string'
-              ? record.lastLoginAt
-              : undefined,
-        };
-      })
-      .filter(
-        (member): member is StaffMember =>
-          member !== null,
-      );
-  } catch (error) {
+  if (error) {
     console.error(
       'Erro ao carregar staffs:',
       error,
@@ -150,23 +93,184 @@ export async function getStaffMembers(): Promise<
 
     return [];
   }
+
+  return (data ?? []).map(
+    (row) => ({
+      discordId:
+        row.discord_id,
+
+      name:
+        typeof row.name === 'string'
+          ? row.name
+          : undefined,
+
+      image:
+        typeof row.image === 'string'
+          ? row.image
+          : undefined,
+
+      role:
+        typeof row.role === 'string' &&
+        row.role.trim()
+          ? row.role.trim()
+          : 'Staff',
+
+      permissions:
+        normalizePermissions(
+          row.permissions,
+        ),
+
+      createdAt:
+        row.created_at ??
+        new Date().toISOString(),
+
+      addedBy:
+        typeof row.added_by === 'string'
+          ? row.added_by
+          : undefined,
+
+      addedByDiscordId:
+        typeof row.added_by_discord_id ===
+        'string'
+          ? row.added_by_discord_id
+          : undefined,
+
+      lastLoginAt:
+        row.last_login_at ??
+        undefined,
+    }),
+  );
 }
 
 export async function saveStaffMembers(
   members: StaffMember[],
 ): Promise<void> {
-  await fs.mkdir(
-    path.dirname(STAFF_FILE),
-    {
-      recursive: true,
-    },
+  const supabase = getSupabaseServer();
+
+  const {
+    data: existingRows,
+    error: readError,
+  } = await supabase
+    .from('staff')
+    .select('discord_id');
+
+  if (readError) {
+    console.error(
+      'Erro ao verificar staffs existentes:',
+      readError,
+    );
+
+    throw readError;
+  }
+
+  const existingIds = new Set(
+    (existingRows ?? []).map(
+      (row) =>
+        String(
+          row.discord_id,
+        ),
+    ),
   );
 
-  await fs.writeFile(
-    STAFF_FILE,
-    JSON.stringify(members, null, 2),
-    'utf8',
+  const nextIds = new Set(
+    members.map(
+      (member) =>
+        member.discordId,
+    ),
   );
+
+  const idsToDelete = [
+    ...existingIds,
+  ].filter(
+    (discordId) =>
+      !nextIds.has(
+        discordId,
+      ),
+  );
+
+  if (idsToDelete.length > 0) {
+    const {
+      error: deleteError,
+    } = await supabase
+      .from('staff')
+      .delete()
+      .in(
+        'discord_id',
+        idsToDelete,
+      );
+
+    if (deleteError) {
+      console.error(
+        'Erro ao remover staffs:',
+        deleteError,
+      );
+
+      throw deleteError;
+    }
+  }
+
+  if (
+    members.length === 0
+  ) {
+    return;
+  }
+
+  const rows = members.map(
+    (member) => ({
+      discord_id:
+        member.discordId,
+
+      name:
+        member.name ??
+        null,
+
+      image:
+        member.image ??
+        null,
+
+      role:
+        member.role,
+
+      permissions:
+        member.permissions,
+
+      created_at:
+        member.createdAt,
+
+      added_by:
+        member.addedBy ??
+        null,
+
+      added_by_discord_id:
+        member.addedByDiscordId ??
+        null,
+
+      last_login_at:
+        member.lastLoginAt ??
+        null,
+    }),
+  );
+
+  const {
+    error: upsertError,
+  } = await supabase
+    .from('staff')
+    .upsert(
+      rows,
+      {
+        onConflict:
+          'discord_id',
+      },
+    );
+
+  if (upsertError) {
+    console.error(
+      'Erro ao salvar staffs:',
+      upsertError,
+    );
+
+    throw upsertError;
+  }
 }
 
 /**
@@ -180,14 +284,90 @@ export async function getStaffByDiscordId(
     return null;
   }
 
-  const members = await getStaffMembers();
+  const supabase =
+    getSupabaseServer();
 
-  return (
-    members.find(
-      (member) =>
-        member.discordId === discordId,
-    ) ?? null
-  );
+  const {
+    data,
+    error,
+  } = await supabase
+    .from('staff')
+    .select(
+      `
+        discord_id,
+        name,
+        image,
+        role,
+        permissions,
+        created_at,
+        added_by,
+        added_by_discord_id,
+        last_login_at
+      `,
+    )
+    .eq(
+      'discord_id',
+      discordId,
+    )
+    .maybeSingle();
+
+  if (error) {
+    console.error(
+      'Erro ao buscar staff:',
+      error,
+    );
+
+    return null;
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  return {
+    discordId:
+      data.discord_id,
+
+    name:
+      typeof data.name === 'string'
+        ? data.name
+        : undefined,
+
+    image:
+      typeof data.image === 'string'
+        ? data.image
+        : undefined,
+
+    role:
+      typeof data.role === 'string' &&
+      data.role.trim()
+        ? data.role.trim()
+        : 'Staff',
+
+    permissions:
+      normalizePermissions(
+        data.permissions,
+      ),
+
+    createdAt:
+      data.created_at ??
+      new Date().toISOString(),
+
+    addedBy:
+      typeof data.added_by === 'string'
+        ? data.added_by
+        : undefined,
+
+    addedByDiscordId:
+      typeof data.added_by_discord_id ===
+      'string'
+        ? data.added_by_discord_id
+        : undefined,
+
+    lastLoginAt:
+      data.last_login_at ??
+      undefined,
+  };
 }
 
 export function staffHasPermission(
@@ -213,30 +393,46 @@ export async function updateStaffDiscordProfile({
   name?: string | null;
   image?: string | null;
 }): Promise<void> {
-  const members = await getStaffMembers();
+  const supabase =
+    getSupabaseServer();
 
-  const memberIndex = members.findIndex(
-    (member) =>
-      member.discordId === discordId,
-  );
-
-  if (memberIndex === -1) {
-    return;
-  }
-
-  members[memberIndex] = {
-    ...members[memberIndex],
-
-    name:
-      name?.trim() ||
-      members[memberIndex].name,
-
-    image:
-      image?.trim() ||
-      members[memberIndex].image,
-
-    lastLoginAt: new Date().toISOString(),
+  const updates: {
+    name?: string;
+    image?: string;
+    last_login_at: string;
+  } = {
+    last_login_at:
+      new Date().toISOString(),
   };
 
-  await saveStaffMembers(members);
+  if (name?.trim()) {
+    updates.name =
+      name.trim();
+  }
+
+  if (image?.trim()) {
+    updates.image =
+      image.trim();
+  }
+
+  const {
+    error,
+  } = await supabase
+    .from('staff')
+    .update(
+      updates,
+    )
+    .eq(
+      'discord_id',
+      discordId,
+    );
+
+  if (error) {
+    console.error(
+      'Erro ao atualizar perfil do staff:',
+      error,
+    );
+
+    throw error;
+  }
 }
