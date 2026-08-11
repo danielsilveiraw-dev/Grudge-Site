@@ -17,13 +17,6 @@ type SessionUser = {
   discordId?: string;
 };
 
-/**
- * Busca o usuário autenticado E as permissões
- * diretamente do data/staff.json.
- *
- * Assim não dependemos de permissões antigas
- * armazenadas dentro da sessão.
- */
 export async function getAdminUser() {
   const session = await auth();
 

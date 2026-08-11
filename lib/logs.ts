@@ -1,48 +1,171 @@
-import fs from 'fs/promises';
-import path from 'path';
 import { randomUUID } from 'crypto';
+
+import { getSupabaseServer } from '@/lib/supabase-server';
 
 export type LogEntry = {
   id: string;
-  timestamp: string; // ISO
+  timestamp: string;
   action: string;
   details?: string;
 };
 
-const LOG_FILE = path.join(process.cwd(), 'data', 'logs.json');
-const MAX_LOGS = 300; // evita o arquivo crescer pra sempre
+const MAX_LOGS = 300;
 
 export async function getLogs(): Promise<LogEntry[]> {
-  try {
-    const raw = await fs.readFile(LOG_FILE, 'utf-8');
-    const logs: LogEntry[] = JSON.parse(raw);
-    return logs.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
-  } catch {
+  const supabase =
+    getSupabaseServer();
+
+  const {
+    data,
+    error,
+  } = await supabase
+    .from('logs')
+    .select(
+      `
+        id,
+        timestamp,
+        action,
+        details
+      `,
+    )
+    .order(
+      'timestamp',
+      {
+        ascending: false,
+      },
+    )
+    .limit(MAX_LOGS);
+
+  if (error) {
+    console.error(
+      'Erro ao buscar logs:',
+      error,
+    );
+
     return [];
   }
+
+  return (data ?? []).map(
+    (log) => ({
+      id:
+        String(
+          log.id,
+        ),
+
+      timestamp:
+        String(
+          log.timestamp,
+        ),
+
+      action:
+        String(
+          log.action,
+        ),
+
+      details:
+        typeof log.details === 'string' &&
+        log.details
+          ? log.details
+          : undefined,
+    }),
+  );
 }
 
-export async function addLog(action: string, details?: string): Promise<void> {
-  let logs: LogEntry[] = [];
-  try {
-    const raw = await fs.readFile(LOG_FILE, 'utf-8');
-    logs = JSON.parse(raw);
-  } catch {
-    logs = [];
+export async function addLog(
+  action: string,
+  details?: string,
+): Promise<void> {
+  const supabase =
+    getSupabaseServer();
+
+  const {
+    error: insertError,
+  } = await supabase
+    .from('logs')
+    .insert({
+      id:
+        randomUUID(),
+
+      timestamp:
+        new Date().toISOString(),
+
+      action,
+
+      details:
+        details ??
+        null,
+    });
+
+  if (insertError) {
+    console.error(
+      'Erro ao adicionar log:',
+      insertError,
+    );
+
+    throw insertError;
   }
 
-  logs.push({
-    id: randomUUID(),
-    timestamp: new Date().toISOString(),
-    action,
-    details,
-  });
+  /*
+   * Mantém no máximo MAX_LOGS registros.
+   *
+   * Buscamos os registros que ultrapassam
+   * o limite e removemos os mais antigos.
+   */
+  const {
+    data: oldLogs,
+    error: readError,
+  } = await supabase
+    .from('logs')
+    .select('id')
+    .order(
+      'timestamp',
+      {
+        ascending: false,
+      },
+    )
+    .range(
+      MAX_LOGS,
+      MAX_LOGS + 999,
+    );
 
-  // mantém só os mais recentes
-  if (logs.length > MAX_LOGS) {
-    logs = logs.slice(logs.length - MAX_LOGS);
+  if (readError) {
+    console.error(
+      'Erro ao verificar logs antigos:',
+      readError,
+    );
+
+    return;
   }
 
-  await fs.mkdir(path.dirname(LOG_FILE), { recursive: true });
-  await fs.writeFile(LOG_FILE, JSON.stringify(logs, null, 2), 'utf-8');
+  if (
+    !oldLogs ||
+    oldLogs.length === 0
+  ) {
+    return;
+  }
+
+  const idsToDelete =
+    oldLogs.map(
+      (log) =>
+        String(
+          log.id,
+        ),
+    );
+
+  const {
+    error: deleteError,
+  } = await supabase
+    .from('logs')
+    .delete()
+    .in(
+      'id',
+      idsToDelete,
+    );
+
+  if (deleteError) {
+    console.error(
+      'Erro ao limpar logs antigos:',
+      deleteError,
+    );
+  }
 }

@@ -1,5 +1,4 @@
-import fs from 'fs/promises';
-import path from 'path';
+import { getSupabaseServer } from '@/lib/supabase-server';
 
 export const SITE_PAGES = [
   '/',
@@ -8,7 +7,8 @@ export const SITE_PAGES = [
   '/enigmas',
 ] as const;
 
-export type SitePage = (typeof SITE_PAGES)[number];
+export type SitePage =
+  (typeof SITE_PAGES)[number];
 
 export type Song = {
   id: string;
@@ -19,42 +19,236 @@ export type Song = {
   createdAt: string;
 };
 
-const DATA_FILE = path.join(process.cwd(), 'data', 'music.json');
+type MusicRow = {
+  id: string;
+  name: string;
+  audio: string;
+  cover: string | null;
+  pages: unknown;
+  created_at: string;
+};
 
-export async function getSongs(): Promise<Song[]> {
-  try {
-    const raw = await fs.readFile(DATA_FILE, 'utf8');
-    const parsed = JSON.parse(raw);
-
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed.map((song) => {
-      const validPages = Array.isArray(song.pages)
-        ? song.pages.filter((page: unknown): page is SitePage =>
-            SITE_PAGES.includes(page as SitePage),
-          )
-        : [];
-
-      return {
-        ...song,
-        pages: validPages.length > 0 ? validPages : ['/'],
-      };
-    });
-  } catch {
-    return [];
+function normalizePages(
+  value: unknown,
+): SitePage[] {
+  if (!Array.isArray(value)) {
+    return ['/'];
   }
+
+  const validPages =
+    value.filter(
+      (
+        page,
+      ): page is SitePage =>
+        typeof page === 'string' &&
+        SITE_PAGES.includes(
+          page as SitePage,
+        ),
+    );
+
+  return validPages.length > 0
+    ? validPages
+    : ['/'];
 }
 
-export async function saveSongs(songs: Song[]): Promise<void> {
-  await fs.mkdir(path.dirname(DATA_FILE), {
-    recursive: true,
-  });
+export async function getSongs(): Promise<
+  Song[]
+> {
+  const supabase =
+    getSupabaseServer();
 
-  await fs.writeFile(
-    DATA_FILE,
-    JSON.stringify(songs, null, 2),
-    'utf8',
+  const {
+    data,
+    error,
+  } = await supabase
+    .from('music')
+    .select(
+      `
+        id,
+        name,
+        audio,
+        cover,
+        pages,
+        created_at
+      `,
+    )
+    .order(
+      'created_at',
+      {
+        ascending: true,
+      },
+    );
+
+  if (error) {
+    console.error(
+      'Erro ao buscar músicas:',
+      error,
+    );
+
+    return [];
+  }
+
+  return ((data ?? []) as MusicRow[])
+    .map((song) => ({
+      id:
+        String(
+          song.id ?? '',
+        ),
+
+      name:
+        String(
+          song.name ?? '',
+        ),
+
+      audio:
+        String(
+          song.audio ?? '',
+        ),
+
+      cover:
+        typeof song.cover === 'string' &&
+        song.cover
+          ? song.cover
+          : undefined,
+
+      pages:
+        normalizePages(
+          song.pages,
+        ),
+
+      createdAt:
+        typeof song.created_at === 'string'
+          ? song.created_at
+          : new Date().toISOString(),
+    }))
+    .filter(
+      (song) =>
+        song.id &&
+        song.name &&
+        song.audio,
+    );
+}
+
+export async function saveSongs(
+  songs: Song[],
+): Promise<void> {
+  const supabase =
+    getSupabaseServer();
+
+  const {
+    data: existingRows,
+    error: readError,
+  } = await supabase
+    .from('music')
+    .select('id');
+
+  if (readError) {
+    console.error(
+      'Erro ao verificar músicas existentes:',
+      readError,
+    );
+
+    throw readError;
+  }
+
+  const existingIds =
+    new Set(
+      (existingRows ?? []).map(
+        (row) =>
+          String(
+            row.id,
+          ),
+      ),
+    );
+
+  const nextIds =
+    new Set(
+      songs.map(
+        (song) =>
+          song.id,
+      ),
+    );
+
+  const idsToDelete = [
+    ...existingIds,
+  ].filter(
+    (id) =>
+      !nextIds.has(id),
   );
+
+  if (
+    idsToDelete.length > 0
+  ) {
+    const {
+      error: deleteError,
+    } = await supabase
+      .from('music')
+      .delete()
+      .in(
+        'id',
+        idsToDelete,
+      );
+
+    if (deleteError) {
+      console.error(
+        'Erro ao remover músicas:',
+        deleteError,
+      );
+
+      throw deleteError;
+    }
+  }
+
+  if (
+    songs.length === 0
+  ) {
+    return;
+  }
+
+  const rows =
+    songs.map(
+      (song) => ({
+        id:
+          song.id,
+
+        name:
+          song.name,
+
+        audio:
+          song.audio,
+
+        cover:
+          song.cover ??
+          null,
+
+        pages:
+          normalizePages(
+            song.pages,
+          ),
+
+        created_at:
+          song.createdAt,
+      }),
+    );
+
+  const {
+    error: upsertError,
+  } = await supabase
+    .from('music')
+    .upsert(
+      rows,
+      {
+        onConflict:
+          'id',
+      },
+    );
+
+  if (upsertError) {
+    console.error(
+      'Erro ao salvar músicas:',
+      upsertError,
+    );
+
+    throw upsertError;
+  }
 }
