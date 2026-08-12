@@ -1,26 +1,47 @@
 'use client';
 
-import {
-  useState,
-} from 'react';
+import { useState } from 'react';
 
 const DISCORD_TICKET_URL =
   'https://discord.com/channels/894920634486894633/1489817377376960783';
 
 export default function HelpBubble() {
-  const [open, setOpen] =
-    useState(false);
+  const [open, setOpen] = useState(false);
 
   return (
     <>
       {/* BOTÃO FLUTUANTE */}
       <button
         type="button"
-        onClick={() =>
-          setOpen(true)
-        }
+        onClick={() => setOpen(true)}
         aria-label="Abrir ajuda"
-        className="fixed bottom-6 right-6 z-[80] flex h-14 w-14 items-center justify-center rounded-full border border-accent-hot/50 bg-bg-mid/95 text-xl text-accent-hot shadow-[0_0_30px_rgba(255,61,129,0.25)] backdrop-blur-xl transition hover:-translate-y-1 hover:bg-accent-hot hover:text-bg-deep"
+        className="
+          fixed
+          bottom-6
+          right-6
+          z-[999]
+          flex
+          h-14
+          w-14
+          items-center
+          justify-center
+          rounded-full
+          border
+          border-accent-hot/50
+          bg-bg-mid/95
+          text-xl
+          font-bold
+          text-accent-hot
+          shadow-[0_0_30px_rgba(255,61,129,0.30)]
+          backdrop-blur-xl
+          transition
+          duration-300
+          hover:-translate-y-1
+          hover:border-accent-hot
+          hover:bg-accent-hot
+          hover:text-bg-deep
+          hover:shadow-[0_0_40px_rgba(255,61,129,0.45)]
+        "
       >
         ?
       </button>
@@ -30,37 +51,80 @@ export default function HelpBubble() {
         <button
           type="button"
           aria-label="Fechar ajuda"
-          onClick={() =>
-            setOpen(false)
-          }
-          className="fixed inset-0 z-[81] bg-black/40 backdrop-blur-[2px]"
+          onClick={() => setOpen(false)}
+          className="
+            fixed
+            inset-0
+            z-[1000]
+            cursor-default
+            bg-black/45
+            backdrop-blur-[3px]
+          "
         />
       )}
 
-      {/* PAINEL */}
+      {/* PAINEL DE AJUDA */}
       <aside
-        className={`fixed bottom-6 right-6 z-[82] w-[calc(100vw-3rem)] max-w-[360px] overflow-hidden rounded-[24px] border border-line-soft bg-bg-deep/95 shadow-[0_25px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl transition-all duration-300 ${
-          open
-            ? 'translate-y-0 opacity-100'
-            : 'pointer-events-none translate-y-4 opacity-0'
-        }`}
+        className={`
+          fixed
+          bottom-6
+          right-6
+          z-[1001]
+          w-[calc(100vw-3rem)]
+          max-w-[370px]
+          overflow-hidden
+          rounded-[24px]
+          border
+          border-line-soft
+          bg-bg-deep/95
+          shadow-[0_25px_80px_rgba(0,0,0,0.55)]
+          backdrop-blur-xl
+          transition-all
+          duration-300
+          ${
+            open
+              ? 'translate-y-0 scale-100 opacity-100'
+              : 'pointer-events-none translate-y-4 scale-[0.97] opacity-0'
+          }
+        `}
       >
+        {/* brilho decorativo */}
+        <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-accent-hot/10 blur-3xl" />
+
         <div className="relative p-6">
+          {/* FECHAR */}
           <button
             type="button"
-            onClick={() =>
-              setOpen(false)
-            }
+            onClick={() => setOpen(false)}
             aria-label="Fechar"
-            className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full border border-line-soft text-sm text-text-dim transition hover:border-accent-hot hover:text-accent-hot"
+            className="
+              absolute
+              right-4
+              top-4
+              flex
+              h-8
+              w-8
+              items-center
+              justify-center
+              rounded-full
+              border
+              border-line-soft
+              text-sm
+              text-text-dim
+              transition
+              hover:border-accent-hot
+              hover:text-accent-hot
+            "
           >
             ×
           </button>
 
-          <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl border border-accent-hot/30 bg-accent-hot/10 text-xl text-accent-hot">
+          {/* ÍCONE */}
+          <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl border border-accent-hot/30 bg-accent-hot/10 text-xl font-bold text-accent-hot shadow-[0_0_20px_rgba(255,61,129,0.12)]">
             ?
           </div>
 
+          {/* CABEÇALHO */}
           <p className="text-[0.58rem] font-bold uppercase tracking-[0.2em] text-accent-hot">
             suporte
           </p>
@@ -70,14 +134,35 @@ export default function HelpBubble() {
           </h2>
 
           <p className="mt-3 text-[0.78rem] leading-relaxed text-text-dim">
-            Abra um ticket no nosso Discord e fale diretamente com a equipe.
+            Abra um ticket no nosso Discord e fale diretamente com a equipe do
+            Grudge.
           </p>
 
+          {/* BOTÃO DISCORD */}
           <a
             href={DISCORD_TICKET_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-6 flex w-full items-center justify-center rounded-xl bg-accent-hot px-4 py-3 text-[0.7rem] font-bold uppercase tracking-[0.1em] text-bg-deep transition hover:brightness-110"
+            className="
+              mt-6
+              flex
+              w-full
+              items-center
+              justify-center
+              rounded-xl
+              bg-accent-hot
+              px-4
+              py-3
+              text-[0.7rem]
+              font-bold
+              uppercase
+              tracking-[0.1em]
+              text-bg-deep
+              transition
+              hover:-translate-y-0.5
+              hover:brightness-110
+              hover:shadow-[0_0_25px_rgba(255,61,129,0.25)]
+            "
           >
             abrir ticket no Discord
           </a>
