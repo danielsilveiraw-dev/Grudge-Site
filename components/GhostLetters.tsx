@@ -39,8 +39,6 @@ const GHOST_WORDS = [
   'SANGUE',
   'FOGO',
   'DEMENTAÇÃO',
-
-  // NOVAS
   'DESTINO',
   'FRAGMENTOS',
   'ECO',
@@ -119,20 +117,10 @@ function generateWords(): Ghost[] {
   const isMobile =
     window.innerWidth < 640;
 
-  /*
-   * Todas as palavras aparecem pelo menos
-   * uma vez.
-   */
   const guaranteedWords = [
     ...GHOST_WORDS,
   ];
 
-  /*
-   * Palavras extras aleatórias.
-   *
-   * Desktop recebe mais para preencher
-   * melhor telas grandes.
-   */
   const extraCount =
     isMobile ? 3 : 14;
 
@@ -156,61 +144,81 @@ function generateWords(): Ghost[] {
   );
 
   return words.map(
-    (word, index) => ({
-      content: word,
+    (word, index) => {
+      let left: number;
 
-      kind:
-        'word' as const,
+      if (isMobile) {
+        left =
+          5 +
+          Math.random() * 82;
+      } else {
+        const zone =
+          index % 3;
 
-      /*
-       * Evita colocar as palavras
-       * totalmente coladas nas bordas.
-       */
-      left:
-        4 +
-        Math.random() * 88,
+        if (zone === 0) {
+          // ESQUERDA
+          left =
+            4 +
+            Math.random() * 24;
+        } else if (
+          zone === 1
+        ) {
+          // CENTRO
+          left =
+            35 +
+            Math.random() * 25;
+        } else {
+          // DIREITA
+          left =
+            68 +
+            Math.random() * 22;
+        }
+      }
 
-      top:
-        4 +
-        Math.random() * 88,
-
-      /*
-       * Mais variação de tamanho
-       * principalmente no desktop.
-       */
-      size:
+      const top =
         isMobile
-          ? 11 +
-            Math.random() * 7
-          : 14 +
-            Math.random() * 16,
+          ? 5 +
+            Math.random() * 86
+          : 5 +
+            ((index * 17) % 80) +
+            Math.random() * 7;
 
-      /*
-       * Algumas aparecem e desaparecem
-       * mais lentamente que outras.
-       */
-      duration:
-        9 +
-        Math.random() * 10,
+      return {
+        content: word,
 
-      /*
-       * Distribui as aparições para
-       * evitar todas surgirem juntas.
-       */
-      delay:
-        (index /
-          words.length) *
-          8 +
-        Math.random() * 3,
+        kind:
+          'word' as const,
 
-      peak:
-        0.1 +
-        Math.random() * 0.13,
+        left,
 
-      rotate:
-        -8 +
-        Math.random() * 16,
-    }),
+        top,
+
+        size:
+          isMobile
+            ? 11 +
+              Math.random() * 7
+            : 14 +
+              Math.random() * 16,
+
+        duration:
+          9 +
+          Math.random() * 10,
+
+        delay:
+          (index /
+            words.length) *
+            8 +
+          Math.random() * 3,
+
+        peak:
+          0.1 +
+          Math.random() * 0.13,
+
+        rotate:
+          -8 +
+          Math.random() * 16,
+      };
+    },
   );
 }
 
@@ -228,13 +236,6 @@ export default function GhostLetters() {
       '/admin',
     );
 
-  /*
-   * Em Enigmas e Alfabeto
-   * mostramos os símbolos.
-   *
-   * Nas outras páginas,
-   * mostramos as palavras.
-   */
   const shouldShowSymbols =
     pathname === '/enigmas' ||
     pathname === '/alfabeto';
@@ -300,10 +301,8 @@ export default function GhostLetters() {
       className="pointer-events-none fixed inset-0 z-0 overflow-hidden"
       aria-hidden="true"
     >
-      {/* BRILHO CENTRAL */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,61,129,0.07),transparent_65%)]" />
 
-      {/* PALAVRAS / SÍMBOLOS */}
       {ghosts.map(
         (
           ghost,
