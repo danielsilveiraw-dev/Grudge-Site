@@ -73,50 +73,6 @@ export default function HomeAtmosphere() {
       {/* GLOW INFERIOR */}
       <div className="absolute bottom-[-280px] left-1/2 h-[600px] w-[950px] -translate-x-1/2 rounded-full bg-accent-hot/[0.055] blur-[180px]" />
 
-      {/* SÍMBOLOS ESQUERDOS */}
-      <div
-        className="absolute left-[4vw] top-[18%] hidden select-none xl:block"
-        style={{
-          transform: `translate(${moveX}px, ${moveY}px)`,
-          transition:
-            'transform 700ms ease-out',
-        }}
-      >
-        <span className="block font-display text-[9rem] leading-none text-accent-hot/[0.11]">
-          ꙮ
-        </span>
-
-        <span className="ml-24 mt-20 block font-display text-[6rem] leading-none text-text-main/[0.055]">
-          ⌁
-        </span>
-
-        <span className="-ml-3 mt-16 block font-display text-[8rem] leading-none text-accent-hot/[0.08]">
-          ᚫ
-        </span>
-      </div>
-
-      {/* SÍMBOLOS DIREITOS */}
-      <div
-        className="absolute right-[4vw] top-[16%] hidden select-none text-right xl:block"
-        style={{
-          transform: `translate(${-moveX}px, ${moveY * 0.8}px)`,
-          transition:
-            'transform 850ms ease-out',
-        }}
-      >
-        <span className="block font-display text-[7rem] leading-none text-text-main/[0.055]">
-          ◊
-        </span>
-
-        <span className="-mr-8 mt-20 block font-display text-[10rem] leading-none text-accent-hot/[0.095]">
-          ᛝ
-        </span>
-
-        <span className="mr-16 mt-16 block font-display text-[6rem] leading-none text-text-main/[0.05]">
-          ⌁
-        </span>
-      </div>
-
       {/* GRUDGE LATERAL */}
       <div
         className="absolute left-[-80px] top-1/2 hidden -translate-y-1/2 -rotate-90 select-none 2xl:block"
