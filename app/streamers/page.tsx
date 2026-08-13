@@ -1,5 +1,8 @@
 import Image from 'next/image';
-import { getStreamers, type Streamer } from '@/lib/streamers';
+import {
+  getStreamers,
+  type Streamer,
+} from '@/lib/streamers';
 
 type SocialKey =
   | 'instagram'
@@ -92,7 +95,10 @@ const SOCIALS: SocialItem[] = [
   },
 ];
 
-function getSocialUrl(streamer: Streamer, key: SocialKey) {
+function getSocialUrl(
+  streamer: Streamer,
+  key: SocialKey,
+) {
   const value = streamer[key];
 
   if (typeof value !== 'string') {
@@ -103,7 +109,8 @@ function getSocialUrl(streamer: Streamer, key: SocialKey) {
 }
 
 export default async function StreamersPage() {
-  const streamers = await getStreamers();
+  const streamers =
+    await getStreamers();
 
   return (
     <main className="relative z-[1] mx-auto max-w-[980px] px-6 pb-20 pt-[120px]">
@@ -123,65 +130,87 @@ export default async function StreamersPage() {
         </p>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
-          {streamers.map((streamer) => {
-            const availableSocials = SOCIALS.filter((social) =>
-              Boolean(getSocialUrl(streamer, social.key)),
-            );
+          {streamers.map(
+            (streamer) => {
+              const availableSocials =
+                SOCIALS.filter(
+                  (social) =>
+                    Boolean(
+                      getSocialUrl(
+                        streamer,
+                        social.key,
+                      ),
+                    ),
+                );
 
-            return (
-              <article
-                key={streamer.id}
-                className="group flex items-center gap-5 rounded-[20px] border border-line-soft bg-bg-mid/30 p-4 backdrop-blur-sm transition duration-300 hover:-translate-y-1 hover:border-accent-hot hover:shadow-[0_0_30px_rgba(255,61,129,0.1)]"
-              >
-                <div className="relative shrink-0 overflow-hidden rounded-2xl">
-                  <div className="absolute inset-0 z-10 rounded-2xl border border-accent-hot/0 transition group-hover:border-accent-hot/50" />
+              return (
+                <article
+                  key={streamer.id}
+                  className="group flex items-center gap-5 rounded-[20px] border border-line-soft bg-bg-mid/30 p-4 backdrop-blur-sm transition duration-300 hover:-translate-y-1 hover:border-accent-hot hover:shadow-[0_0_30px_rgba(255,61,129,0.1)]"
+                >
+                  {/* FOTO */}
+                  <div className="relative h-[100px] w-[100px] shrink-0 overflow-hidden rounded-2xl sm:h-[110px] sm:w-[110px]">
+                    <div className="pointer-events-none absolute inset-0 z-10 rounded-2xl border border-accent-hot/0 transition group-hover:border-accent-hot/50" />
 
-                  <Image
-                    src={streamer.image}
-                    alt={streamer.name}
-                    width={110}
-                    height={110}
-                    className="h-[100px] w-[100px] rounded-2xl object-cover transition duration-300 group-hover:scale-105 sm:h-[110px] sm:w-[110px]"
-                  />
-                </div>
+                    <Image
+                      src={streamer.image}
+                      alt={streamer.name}
+                      fill
+                      quality={100}
+                      sizes="(max-width: 640px) 100px, 110px"
+                      className="object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                  </div>
 
-                <div className="min-w-0 flex-1">
-                  <h2 className="truncate font-display text-2xl text-text-main transition group-hover:text-accent-soft">
-                    {streamer.name}
-                  </h2>
+                  <div className="min-w-0 flex-1">
+                    <h2 className="truncate font-display text-2xl text-text-main transition group-hover:text-accent-soft">
+                      {streamer.name}
+                    </h2>
 
-                  {availableSocials.length > 0 ? (
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {availableSocials.map((social) => {
-                        const url = getSocialUrl(
-                          streamer,
-                          social.key,
-                        );
+                    {availableSocials.length >
+                    0 ? (
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {availableSocials.map(
+                          (social) => {
+                            const url =
+                              getSocialUrl(
+                                streamer,
+                                social.key,
+                              );
 
-                        return (
-                          <a
-                            key={social.key}
-                            href={url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            aria-label={`${social.label} de ${streamer.name}`}
-                            title={social.label}
-                            className="flex h-10 w-10 items-center justify-center rounded-full border border-line-soft bg-bg-deep/30 text-text-main transition hover:scale-110 hover:border-accent-hot hover:bg-accent-hot/10 hover:text-accent-hot"
-                          >
-                            {social.icon}
-                          </a>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="mt-3 text-[0.75rem] text-text-dim">
-                      Nenhuma rede cadastrada.
-                    </p>
-                  )}
-                </div>
-              </article>
-            );
-          })}
+                            return (
+                              <a
+                                key={
+                                  social.key
+                                }
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                aria-label={`${social.label} de ${streamer.name}`}
+                                title={
+                                  social.label
+                                }
+                                className="flex h-10 w-10 items-center justify-center rounded-full border border-line-soft bg-bg-deep/30 text-text-main transition hover:scale-110 hover:border-accent-hot hover:bg-accent-hot/10 hover:text-accent-hot"
+                              >
+                                {
+                                  social.icon
+                                }
+                              </a>
+                            );
+                          },
+                        )}
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-[0.75rem] text-text-dim">
+                        Nenhuma rede
+                        cadastrada.
+                      </p>
+                    )}
+                  </div>
+                </article>
+              );
+            },
+          )}
         </div>
       )}
     </main>
