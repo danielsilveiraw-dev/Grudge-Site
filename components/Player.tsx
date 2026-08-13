@@ -78,17 +78,25 @@ export default function Player({
     setCurrentSongIndex,
   ] = useState(0);
 
-  const [isPlaying, setIsPlaying] =
-    useState(false);
+  const [
+    isPlaying,
+    setIsPlaying,
+  ] = useState(false);
 
-  const [isMuted, setIsMuted] =
-    useState(false);
+  const [
+    isMuted,
+    setIsMuted,
+  ] = useState(false);
 
-  const [volume, setVolume] =
-    useState(0.6);
+  const [
+    volume,
+    setVolume,
+  ] = useState(0.6);
 
-  const [errorMsg, setErrorMsg] =
-    useState<string | null>(null);
+  const [
+    errorMsg,
+    setErrorMsg,
+  ] = useState<string | null>(null);
 
   const currentSong =
     allowedSongs[currentSongIndex];
@@ -101,7 +109,8 @@ export default function Player({
     shouldContinuePlaying.current =
       false;
 
-    const audio = audioRef.current;
+    const audio =
+      audioRef.current;
 
     if (audio) {
       audio.pause();
@@ -122,7 +131,8 @@ export default function Player({
   ]);
 
   useEffect(() => {
-    const audio = audioRef.current;
+    const audio =
+      audioRef.current;
 
     if (!audio) {
       return;
@@ -156,7 +166,8 @@ export default function Player({
   }, [currentSongIndex]);
 
   async function playAudio() {
-    const audio = audioRef.current;
+    const audio =
+      audioRef.current;
 
     if (!audio) {
       return;
@@ -187,7 +198,8 @@ export default function Player({
   }
 
   function togglePlay() {
-    const audio = audioRef.current;
+    const audio =
+      audioRef.current;
 
     if (!audio) {
       return;
@@ -204,7 +216,8 @@ export default function Player({
     continuePlaying = isPlaying,
   ) {
     if (allowedSongs.length <= 1) {
-      const audio = audioRef.current;
+      const audio =
+        audioRef.current;
 
       if (audio) {
         audio.currentTime = 0;
@@ -231,7 +244,8 @@ export default function Player({
 
   function previousSong() {
     if (allowedSongs.length <= 1) {
-      const audio = audioRef.current;
+      const audio =
+        audioRef.current;
 
       if (audio) {
         audio.currentTime = 0;
@@ -259,7 +273,8 @@ export default function Player({
   }
 
   function handleAudioError() {
-    const audio = audioRef.current;
+    const audio =
+      audioRef.current;
 
     const code =
       audio?.error?.code;
@@ -278,25 +293,31 @@ export default function Player({
   }
 
   function toggleMute() {
-    const audio = audioRef.current;
+    const audio =
+      audioRef.current;
 
     if (!audio) {
       return;
     }
 
-    audio.muted = !audio.muted;
+    audio.muted =
+      !audio.muted;
 
-    setIsMuted(audio.muted);
+    setIsMuted(
+      audio.muted,
+    );
   }
 
   function handleVolume(
     event: React.ChangeEvent<HTMLInputElement>,
   ) {
-    const value = Number(
-      event.target.value,
-    );
+    const value =
+      Number(
+        event.target.value,
+      );
 
-    const audio = audioRef.current;
+    const audio =
+      audioRef.current;
 
     setVolume(value);
 
@@ -518,7 +539,13 @@ export default function Player({
                 value={volume}
                 onChange={handleVolume}
                 aria-label="Volume"
-                className={`accent-accent-hot ${
+                style={
+                  {
+                    '--volume-progress':
+                      volume * 100,
+                  } as React.CSSProperties
+                }
+                className={`volume-slider ${
                   variant === 'inline'
                     ? 'w-20 sm:w-28'
                     : 'w-14 sm:w-10'

@@ -50,3 +50,120 @@ body {
     transform: translateY(-28px) scale(1.02);
   }
 }
+
+/* =========================================
+   PLAYER - CONTROLE DE VOLUME
+========================================= */
+
+.volume-slider {
+  appearance: none;
+  -webkit-appearance: none;
+
+  height: 5px;
+  border-radius: 999px;
+
+  background: rgba(255, 255, 255, 0.22);
+
+  outline: none;
+  cursor: pointer;
+}
+
+
+/* CHROME / EDGE / OPERA / SAFARI */
+
+.volume-slider::-webkit-slider-runnable-track {
+  height: 5px;
+  border-radius: 999px;
+
+  background: linear-gradient(
+    to right,
+    #ff3d81 0%,
+    #ff3d81 calc(var(--volume-progress, 60) * 1%),
+    rgba(255, 255, 255, 0.22)
+      calc(var(--volume-progress, 60) * 1%),
+    rgba(255, 255, 255, 0.22) 100%
+  );
+}
+
+.volume-slider::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+
+  width: 18px;
+  height: 18px;
+
+  margin-top: -6.5px;
+
+  border: 0;
+  border-radius: 50%;
+
+  background: #ff3d81;
+
+  box-shadow:
+    0 0 0 3px rgba(255, 61, 129, 0.08),
+    0 0 14px rgba(255, 61, 129, 0.35);
+
+  cursor: pointer;
+
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.volume-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.12);
+
+  box-shadow:
+    0 0 0 4px rgba(255, 61, 129, 0.12),
+    0 0 18px rgba(255, 61, 129, 0.5);
+}
+
+
+/* FIREFOX */
+
+.volume-slider::-moz-range-track {
+  height: 5px;
+  border-radius: 999px;
+
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.volume-slider::-moz-range-progress {
+  height: 5px;
+  border-radius: 999px;
+
+  background: #ff3d81;
+}
+
+.volume-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+
+  border: 0;
+  border-radius: 50%;
+
+  background: #ff3d81;
+
+  box-shadow:
+    0 0 0 3px rgba(255, 61, 129, 0.08),
+    0 0 14px rgba(255, 61, 129, 0.35);
+
+  cursor: pointer;
+
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.volume-slider::-moz-range-thumb:hover {
+  transform: scale(1.12);
+
+  box-shadow:
+    0 0 0 4px rgba(255, 61, 129, 0.12),
+    0 0 18px rgba(255, 61, 129, 0.5);
+}
+
+.volume-slider:focus-visible {
+  outline: 2px solid rgba(255, 61, 129, 0.65);
+  outline-offset: 5px;
+}

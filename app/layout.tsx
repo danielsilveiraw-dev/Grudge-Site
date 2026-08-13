@@ -50,19 +50,44 @@ export const metadata: Metadata = {
 
   openGraph: {
     type: 'website',
+
     locale: 'pt_BR',
-    url: '/',
+
+    url: 'https://grudge.com.br',
+
     siteName: 'GRUDGE SMP',
+
     title: 'GRUDGE SMP',
+
     description:
       'Entre no caos. Descubra o desconhecido.',
+
+    images: [
+      {
+        url: '/assets/grudge-logo.png',
+        width: 1536,
+        height: 512,
+        alt: 'GRUDGE SMP',
+      },
+    ],
   },
 
   twitter: {
     card: 'summary_large_image',
+
     title: 'GRUDGE SMP',
+
     description:
       'Entre no caos. Descubra o desconhecido.',
+
+    images: [
+      '/assets/grudge-logo.png',
+    ],
+  },
+
+  robots: {
+    index: true,
+    follow: true,
   },
 };
 
@@ -71,7 +96,8 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const songs = await getSongs();
+  const songs =
+    await getSongs();
 
   return (
     <html
