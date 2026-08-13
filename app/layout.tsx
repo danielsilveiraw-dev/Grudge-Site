@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+
 import {
   Cormorant_Garamond,
   Manrope,
@@ -9,6 +10,7 @@ import './globals.css';
 import GhostLetters from '@/components/GhostLetters';
 import GlobalPlayer from '@/components/GlobalPlayer';
 import SideMenu from '@/components/SideMenu';
+
 import { getSongs } from '@/lib/music';
 
 export const dynamic = 'force-dynamic';
@@ -27,9 +29,41 @@ const body = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: 'GRUDGE SMP',
+  metadataBase: new URL(
+    'https://grudge.com.br',
+  ),
+
+  title: {
+    default: 'GRUDGE SMP',
+    template: '%s | GRUDGE SMP',
+  },
+
   description:
     'Entre no caos. Descubra o desconhecido.',
+
+  applicationName:
+    'GRUDGE SMP',
+
+  alternates: {
+    canonical: '/',
+  },
+
+  openGraph: {
+    type: 'website',
+    locale: 'pt_BR',
+    url: '/',
+    siteName: 'GRUDGE SMP',
+    title: 'GRUDGE SMP',
+    description:
+      'Entre no caos. Descubra o desconhecido.',
+  },
+
+  twitter: {
+    card: 'summary_large_image',
+    title: 'GRUDGE SMP',
+    description:
+      'Entre no caos. Descubra o desconhecido.',
+  },
 };
 
 export default async function RootLayout({
@@ -51,7 +85,9 @@ export default async function RootLayout({
 
         {children}
 
-        <GlobalPlayer songs={songs} />
+        <GlobalPlayer
+          songs={songs}
+        />
       </body>
     </html>
   );
