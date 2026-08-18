@@ -5,33 +5,44 @@ import {
   type SupabaseClient,
 } from '@supabase/supabase-js';
 
-let client: SupabaseClient | null =
-  null;
+let client:
+  | SupabaseClient
+  | null = null;
 
-export function getSupabaseBrowser() {
-  if (client) {
-    return client;
-  }
+let currentUrl = '';
+let currentKey = '';
 
-  const url =
-    process.env
-      .NEXT_PUBLIC_SUPABASE_URL;
-
-  const anonKey =
-    process.env
-      .NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
+export function getSupabaseBrowser(
+  url: string,
+  anonKey: string,
+) {
   if (!url) {
     throw new Error(
-      'NEXT_PUBLIC_SUPABASE_URL não está configurada.',
+      'URL do Supabase não foi fornecida.',
     );
   }
 
   if (!anonKey) {
     throw new Error(
-      'NEXT_PUBLIC_SUPABASE_ANON_KEY não está configurada.',
+      'Chave pública do Supabase não foi fornecida.',
     );
   }
+
+  /*
+   * Reutiliza o mesmo cliente
+   * enquanto as configurações
+   * forem as mesmas.
+   */
+  if (
+    client &&
+    currentUrl === url &&
+    currentKey === anonKey
+  ) {
+    return client;
+  }
+
+  currentUrl = url;
+  currentKey = anonKey;
 
   client = createClient(
     url,
