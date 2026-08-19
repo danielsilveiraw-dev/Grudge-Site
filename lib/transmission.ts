@@ -16,7 +16,8 @@ export type TransmissionRoom = {
   expiresAt: string;
 };
 
-const ROOM_CODE_LENGTH = 6;
+const ROOM_CODE_LENGTH =
+  6;
 
 const ROOM_CHARACTERS =
   'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -26,7 +27,8 @@ function generateRoomCode() {
 
   for (
     let index = 0;
-    index < ROOM_CODE_LENGTH;
+    index <
+    ROOM_CODE_LENGTH;
     index++
   ) {
     const randomIndex =
@@ -48,9 +50,9 @@ function hashPassword(
   password: string,
 ) {
   const salt =
-    randomBytes(16).toString(
-      'hex',
-    );
+    randomBytes(
+      16,
+    ).toString('hex');
 
   const hash =
     scryptSync(
@@ -175,10 +177,15 @@ export async function createTransmissionRoom({
     )
     .insert({
       code,
+
       password_hash:
-        hashPassword(password),
+        hashPassword(
+          password,
+        ),
+
       owner_name:
         ownerName,
+
       expires_at:
         expiresAt.toISOString(),
     })
@@ -202,12 +209,18 @@ export async function createTransmissionRoom({
   }
 
   return {
-    id: data.id,
-    code: data.code,
+    id:
+      data.id,
+
+    code:
+      data.code,
+
     ownerName:
       data.owner_name,
+
     createdAt:
       data.created_at,
+
     expiresAt:
       data.expires_at,
   };
@@ -290,12 +303,18 @@ export async function validateTransmissionRoom({
     success: true,
 
     room: {
-      id: data.id,
-      code: data.code,
+      id:
+        data.id,
+
+      code:
+        data.code,
+
       ownerName:
         data.owner_name,
+
       createdAt:
         data.created_at,
+
       expiresAt:
         data.expires_at,
     },

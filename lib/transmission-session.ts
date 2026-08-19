@@ -13,9 +13,11 @@ const COOKIE_NAME =
 const SESSION_DURATION_MS =
   1000 * 60 * 60 * 12;
 
-type TransmissionSessionPayload = {
+export type TransmissionSessionPayload = {
   roomCode: string;
   name: string;
+  discordId: string;
+  image: string | null;
   isOwner: boolean;
   expiresAt: number;
 };
@@ -63,6 +65,13 @@ function decodePayload(
         'string' ||
       typeof parsed.name !==
         'string' ||
+      typeof parsed.discordId !==
+        'string' ||
+      !(
+        typeof parsed.image ===
+          'string' ||
+        parsed.image === null
+      ) ||
       typeof parsed.isOwner !==
         'boolean' ||
       typeof parsed.expiresAt !==
@@ -84,12 +93,8 @@ function sign(
     'sha256',
     getSecret(),
   )
-    .update(
-      encodedPayload,
-    )
-    .digest(
-      'base64url',
-    );
+    .update(encodedPayload)
+    .digest('base64url');
 }
 
 function safeCompare(
@@ -118,18 +123,22 @@ function safeCompare(
 export async function createTransmissionSession({
   roomCode,
   name,
+  discordId,
+  image,
   isOwner,
 }: {
   roomCode: string;
   name: string;
+  discordId: string;
+  image?: string | null;
   isOwner: boolean;
 }) {
   const expiresAt =
     Date.now() +
     SESSION_DURATION_MS;
 
-  const payload:
-    TransmissionSessionPayload = {
+  const payload: TransmissionSessionPayload =
+    {
       roomCode:
         roomCode
           .trim()
@@ -138,10 +147,17 @@ export async function createTransmissionSession({
       name:
         name
           .trim()
-          .slice(
-            0,
-            28,
-          ),
+          .slice(0, 64) ||
+        'Usuário',
+
+      discordId:
+        discordId.trim(),
+
+      image:
+        typeof image ===
+        'string'
+          ? image
+          : null,
 
       isOwner,
 
@@ -149,14 +165,10 @@ export async function createTransmissionSession({
     };
 
   const encodedPayload =
-    encodePayload(
-      payload,
-    );
+    encodePayload(payload);
 
   const signature =
-    sign(
-      encodedPayload,
-    );
+    sign(encodedPayload);
 
   const token =
     `${encodedPayload}.${signature}`;
@@ -169,15 +181,17 @@ export async function createTransmissionSession({
     token,
     {
       httpOnly: true,
+
       secure:
         process.env.NODE_ENV ===
         'production',
+
       sameSite: 'lax',
+
       path: '/',
+
       expires:
-        new Date(
-          expiresAt,
-        ),
+        new Date(expiresAt),
     },
   );
 }
@@ -210,9 +224,7 @@ export async function getTransmissionSession(
   }
 
   const expectedSignature =
-    sign(
-      encodedPayload,
-    );
+    sign(encodedPayload);
 
   if (
     !safeCompare(

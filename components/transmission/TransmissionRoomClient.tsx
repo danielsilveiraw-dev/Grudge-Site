@@ -1,5 +1,7 @@
 'use client';
 
+import Image from 'next/image';
+
 import {
   useEffect,
   useMemo,
@@ -17,7 +19,9 @@ import {
 
 type Participant = {
   id: string;
+  discordId: string;
   name: string;
+  image: string | null;
   isOwner: boolean;
   isSharing: boolean;
   joinedAt: string;
@@ -56,31 +60,61 @@ type SignalPayload =
 type TransmissionRoomClientProps = {
   code: string;
   name: string;
+  discordId: string;
+  image: string | null;
   isOwner: boolean;
-
-  /*
-   * Essas informações agora chegam
-   * pelo Server Component.
-   *
-   * Assim não dependemos do Next.js
-   * incorporar NEXT_PUBLIC_* durante
-   * o build da Discloud.
-   */
   supabaseUrl: string;
   supabaseAnonKey: string;
 };
 
-const ICE_SERVERS:
-  RTCIceServer[] = [
-    {
-      urls:
-        'stun:stun.cloudflare.com:3478',
-    },
-  ];
+const ICE_SERVERS: RTCIceServer[] = [
+  {
+    urls:
+      'stun:stun.cloudflare.com:3478',
+  },
+];
+
+function UserAvatar({
+  image,
+  name,
+  size = 44,
+}: {
+  image: string | null;
+  name: string;
+  size?: number;
+}) {
+  return (
+    <div
+      className="relative shrink-0 overflow-hidden rounded-full border border-line-soft bg-bg-deep"
+      style={{
+        width: size,
+        height: size,
+      }}
+    >
+      {image ? (
+        <Image
+          src={image}
+          alt={name}
+          fill
+          sizes={`${size}px`}
+          className="object-cover"
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center font-display text-lg text-accent-hot">
+          {name
+            .charAt(0)
+            .toUpperCase()}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function TransmissionRoomClient({
   code,
   name,
+  discordId,
+  image,
   isOwner,
   supabaseUrl,
   supabaseAnonKey,
@@ -121,12 +155,11 @@ export default function TransmissionRoomClient({
     setIsMuted,
   ] = useState(false);
 
-  /*
-   * Mantemos algumas informações
-   * também em refs para que handlers
-   * do Supabase/WebRTC sempre tenham
-   * acesso ao valor mais recente.
-   */
+  const [
+    copiedInvite,
+    setCopiedInvite,
+  ] = useState(false);
+
   const watchingIdRef =
     useRef<string | null>(
       null,
@@ -145,11 +178,6 @@ export default function TransmissionRoomClient({
       null,
     );
 
-  /*
-   * Quando EU estou transmitindo,
-   * existe uma RTCPeerConnection
-   * diferente para cada espectador.
-   */
   const outgoingPeersRef =
     useRef<
       Map<
@@ -160,21 +188,12 @@ export default function TransmissionRoomClient({
       new Map(),
     );
 
-  /*
-   * Quando EU estou assistindo,
-   * só precisamos de uma conexão
-   * de entrada por vez.
-   */
   const incomingPeerRef =
     useRef<{
       streamerId: string;
       peer: RTCPeerConnection;
     } | null>(null);
 
-  /*
-   * ICE candidates que chegaram
-   * antes da remoteDescription.
-   */
   const pendingIceRef =
     useRef<
       Map<
@@ -190,9 +209,6 @@ export default function TransmissionRoomClient({
       null,
     );
 
-  /*
-   * ID único desta aba/navegador.
-   */
   const participantId =
     useMemo(() => {
       if (
@@ -229,12 +245,9 @@ export default function TransmissionRoomClient({
       return;
     }
 
-    peer.ontrack =
-      null;
-
+    peer.ontrack = null;
     peer.onicecandidate =
       null;
-
     peer.onconnectionstatechange =
       null;
 
@@ -255,12 +268,9 @@ export default function TransmissionRoomClient({
         peer,
         viewerId,
       ) => {
-        peer.ontrack =
-          null;
-
+        peer.ontrack = null;
         peer.onicecandidate =
           null;
-
         peer.onconnectionstatechange =
           null;
 
@@ -314,10 +324,6 @@ export default function TransmissionRoomClient({
       channelRef.current;
 
     if (!channel) {
-      console.warn(
-        '[WEBRTC] Canal Realtime indisponível.',
-      );
-
       return;
     }
 
@@ -346,7 +352,11 @@ export default function TransmissionRoomClient({
       id:
         participantId,
 
+      discordId,
+
       name,
+
+      image,
 
       isOwner,
 
@@ -504,11 +514,6 @@ export default function TransmissionRoomClient({
           return;
         }
 
-        console.log(
-          '[WEBRTC] Stream recebido de:',
-          streamerId,
-        );
-
         const video =
           remoteVideoRef.current;
 
@@ -565,12 +570,6 @@ export default function TransmissionRoomClient({
     return peer;
   }
 
-  /*
-   * Evita o erro:
-   *
-   * "A sender already exists
-   * for the track."
-   */
   function ensureStreamTracks(
     peer: RTCPeerConnection,
     stream: MediaStream,
@@ -695,20 +694,10 @@ export default function TransmissionRoomClient({
     sdp:
       RTCSessionDescriptionInit,
   ) {
-    /*
-     * Só aceitamos a offer de quem
-     * realmente estamos tentando
-     * assistir.
-     */
     if (
       watchingIdRef.current !==
       streamerId
     ) {
-      console.warn(
-        '[WEBRTC] Offer ignorada de:',
-        streamerId,
-      );
-
       return;
     }
 
@@ -787,11 +776,6 @@ export default function TransmissionRoomClient({
     candidate:
       RTCIceCandidateInit,
   ) {
-    /*
-     * Primeiro verificamos se o
-     * candidato veio de alguém
-     * assistindo à nossa transmissão.
-     */
     const outgoingPeer =
       outgoingPeersRef.current.get(
         senderId,
@@ -818,26 +802,15 @@ export default function TransmissionRoomClient({
         return;
       }
 
-      try {
-        await outgoingPeer.addIceCandidate(
-          new RTCIceCandidate(
-            candidate,
-          ),
-        );
-      } catch (error) {
-        console.warn(
-          '[WEBRTC] ICE de saída inválido:',
-          error,
-        );
-      }
+      await outgoingPeer.addIceCandidate(
+        new RTCIceCandidate(
+          candidate,
+        ),
+      );
 
       return;
     }
 
-    /*
-     * Depois verificamos se veio
-     * de quem estamos assistindo.
-     */
     const incoming =
       incomingPeerRef.current;
 
@@ -847,8 +820,7 @@ export default function TransmissionRoomClient({
         senderId
     ) {
       if (
-        !incoming.peer
-          .remoteDescription
+        !incoming.peer.remoteDescription
       ) {
         const pending =
           pendingIceRef.current.get(
@@ -867,26 +839,15 @@ export default function TransmissionRoomClient({
         return;
       }
 
-      try {
-        await incoming.peer.addIceCandidate(
-          new RTCIceCandidate(
-            candidate,
-          ),
-        );
-      } catch (error) {
-        console.warn(
-          '[WEBRTC] ICE de entrada inválido:',
-          error,
-        );
-      }
+      await incoming.peer.addIceCandidate(
+        new RTCIceCandidate(
+          candidate,
+        ),
+      );
 
       return;
     }
 
-    /*
-     * O candidate pode chegar
-     * antes da offer.
-     */
     const pending =
       pendingIceRef.current.get(
         senderId,
@@ -915,10 +876,6 @@ export default function TransmissionRoomClient({
         !navigator.mediaDevices
           .getDisplayMedia
       ) {
-        console.error(
-          '[TRANSMISSÃO] Este navegador não suporta compartilhamento de tela.',
-        );
-
         return;
       }
 
@@ -951,10 +908,6 @@ export default function TransmissionRoomClient({
             },
           );
 
-        console.warn(
-          '[TRANSMISSÃO] Nenhuma tela foi selecionada.',
-        );
-
         return;
       }
 
@@ -979,58 +932,13 @@ export default function TransmissionRoomClient({
         () => {
           void stopScreenShare();
         };
-
-      console.log(
-        '[TRANSMISSÃO] Compartilhamento iniciado.',
-        {
-          video:
-            stream
-              .getVideoTracks()
-              .length,
-
-          audio:
-            stream
-              .getAudioTracks()
-              .length,
-        },
-      );
     } catch (error) {
       if (
-        error instanceof
-        DOMException
-      ) {
-        if (
-          error.name ===
+        error instanceof DOMException &&
+        error.name ===
           'NotAllowedError'
-        ) {
-          console.log(
-            '[TRANSMISSÃO] Compartilhamento não autorizado ou cancelado pelo usuário.',
-          );
-
-          return;
-        }
-
-        if (
-          error.name ===
-          'NotFoundError'
-        ) {
-          console.warn(
-            '[TRANSMISSÃO] Nenhuma tela, janela ou aba disponível para compartilhar.',
-          );
-
-          return;
-        }
-
-        if (
-          error.name ===
-          'InvalidStateError'
-        ) {
-          console.warn(
-            '[TRANSMISSÃO] O compartilhamento precisa ser iniciado diretamente por um clique.',
-          );
-
-          return;
-        }
+      ) {
+        return;
       }
 
       console.error(
@@ -1257,8 +1165,17 @@ export default function TransmissionRoomClient({
         url,
       );
 
-      console.log(
-        '[TRANSMISSÃO] Convite copiado.',
+      setCopiedInvite(
+        true,
+      );
+
+      window.setTimeout(
+        () => {
+          setCopiedInvite(
+            false,
+          );
+        },
+        2000,
       );
     } catch (error) {
       console.error(
@@ -1269,16 +1186,6 @@ export default function TransmissionRoomClient({
   }
 
   useEffect(() => {
-    /*
-     * Agora o cliente Supabase recebe
-     * os valores que vieram do servidor.
-     *
-     * NÃO usamos mais:
-     *
-     * process.env.NEXT_PUBLIC_SUPABASE_URL
-     *
-     * dentro do navegador.
-     */
     const supabase =
       getSupabaseBrowser(
         supabaseUrl,
@@ -1287,11 +1194,6 @@ export default function TransmissionRoomClient({
 
     const channelName =
       `transmission:${normalizedCode}`;
-
-    console.log(
-      '[TRANSMISSÃO] Canal:',
-      channelName,
-    );
 
     const channel =
       supabase.channel(
@@ -1336,7 +1238,9 @@ export default function TransmissionRoomClient({
               const data =
                 entry as unknown as {
                   id?: string;
+                  discordId?: string;
                   name?: string;
+                  image?: string | null;
                   isOwner?: boolean;
                   isSharing?: boolean;
                   joinedAt?: string;
@@ -1353,8 +1257,18 @@ export default function TransmissionRoomClient({
                   data.id ??
                   presenceKey,
 
+                discordId:
+                  data.discordId ??
+                  '',
+
                 name:
                   data.name,
+
+                image:
+                  typeof data.image ===
+                  'string'
+                    ? data.image
+                    : null,
 
                 isOwner:
                   Boolean(
@@ -1493,14 +1407,9 @@ export default function TransmissionRoomClient({
         if (
           !signal ||
           signal.senderId ===
-            participantId
-        ) {
-          return;
-        }
-
-        if (
+            participantId ||
           signal.targetId !==
-          participantId
+            participantId
         ) {
           return;
         }
@@ -1570,11 +1479,6 @@ export default function TransmissionRoomClient({
         status,
         error,
       ) => {
-        console.log(
-          '[TRANSMISSÃO] Status:',
-          status,
-        );
-
         if (
           status ===
           'SUBSCRIBED'
@@ -1587,7 +1491,11 @@ export default function TransmissionRoomClient({
             id:
               participantId,
 
+            discordId,
+
             name,
+
+            image,
 
             isOwner,
 
@@ -1662,7 +1570,9 @@ export default function TransmissionRoomClient({
   }, [
     normalizedCode,
     participantId,
+    discordId,
     name,
+    image,
     isOwner,
     supabaseUrl,
     supabaseAnonKey,
@@ -1691,45 +1601,69 @@ export default function TransmissionRoomClient({
     );
 
   return (
-    <main className="relative z-[1] min-h-screen px-4 pb-8 pt-[100px] sm:px-6">
-      <div className="mx-auto max-w-[1450px]">
+    <main className="relative z-[1] min-h-screen overflow-hidden px-3 pb-6 pt-[90px] sm:px-5">
+      <div className="pointer-events-none absolute left-1/2 top-[25%] h-[700px] w-[1200px] -translate-x-1/2 rounded-full bg-accent-hot/[0.05] blur-[180px]" />
+
+      <div className="relative mx-auto max-w-[1500px]">
 
         {/* CABEÇALHO */}
-        <header className="mb-4 flex flex-col gap-3 rounded-[18px] border border-line-soft bg-bg-mid/30 px-5 py-4 backdrop-blur-md lg:flex-row lg:items-center lg:justify-between">
+        <header className="mb-3 flex flex-col gap-4 rounded-[20px] border border-line-soft bg-bg-mid/35 px-4 py-4 shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-xl lg:flex-row lg:items-center lg:justify-between">
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex min-w-0 items-center gap-4">
 
-            <span className="rounded-lg border border-accent-hot/30 bg-accent-hot/[0.08] px-3 py-2 font-mono text-[0.72rem] font-bold tracking-[0.18em] text-accent-hot">
-              {normalizedCode}
-            </span>
+            <UserAvatar
+              image={
+                image
+              }
+              name={
+                name
+              }
+              size={
+                46
+              }
+            />
 
-            <span className="text-[0.75rem] text-text-main">
-              {name}
-            </span>
+            <div className="min-w-0">
 
-            {isOwner && (
-              <span className="rounded-full border border-accent-hot/30 px-2.5 py-1 text-[0.5rem] font-bold uppercase tracking-[0.12em] text-accent-hot">
-                dono
-              </span>
-            )}
+              <div className="flex flex-wrap items-center gap-2">
 
-            <span className="flex items-center gap-2 text-[0.65rem] text-text-dim">
+                <p className="truncate font-display text-[1.05rem] text-text-main">
+                  {name}
+                </p>
 
-              <span
-                className={`h-2 w-2 rounded-full ${
-                  connectionStatus ===
-                  'connected'
-                    ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.7)]'
-                    : connectionStatus ===
-                      'error'
-                      ? 'bg-red-400'
-                      : 'animate-pulse bg-yellow-300'
-                }`}
-              />
+                {isOwner && (
+                  <span className="rounded-full border border-accent-hot/30 bg-accent-hot/[0.06] px-2 py-1 text-[0.46rem] font-bold uppercase tracking-[0.11em] text-accent-hot">
+                    dono
+                  </span>
+                )}
 
-              {statusLabel}
+              </div>
 
-            </span>
+              <div className="mt-1 flex flex-wrap items-center gap-3">
+
+                <span className="font-mono text-[0.58rem] uppercase tracking-[0.15em] text-text-dim">
+                  sala {normalizedCode}
+                </span>
+
+                <span className="flex items-center gap-2 text-[0.56rem] text-text-dim">
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      connectionStatus ===
+                      'connected'
+                        ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.65)]'
+                        : connectionStatus ===
+                          'error'
+                          ? 'bg-red-400'
+                          : 'animate-pulse bg-yellow-300'
+                    }`}
+                  />
+
+                  {statusLabel}
+                </span>
+
+              </div>
+
+            </div>
 
           </div>
 
@@ -1741,8 +1675,12 @@ export default function TransmissionRoomClient({
                 onClick={
                   startScreenShare
                 }
-                className="rounded-xl bg-accent-hot px-4 py-2.5 text-[0.62rem] font-bold uppercase tracking-[0.1em] text-bg-deep transition hover:-translate-y-0.5 hover:brightness-110"
+                className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-accent-hot px-4 py-2.5 text-[0.58rem] font-bold uppercase tracking-[0.1em] text-bg-deep transition hover:-translate-y-0.5 hover:brightness-110"
               >
+                <span>
+                  ▣
+                </span>
+
                 compartilhar tela
               </button>
             ) : (
@@ -1751,8 +1689,10 @@ export default function TransmissionRoomClient({
                 onClick={
                   stopScreenShare
                 }
-                className="rounded-xl border border-red-400/40 bg-red-500/[0.08] px-4 py-2.5 text-[0.62rem] font-bold uppercase tracking-[0.1em] text-red-300 transition hover:bg-red-500/15"
+                className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-red-400/40 bg-red-500/[0.07] px-4 py-2.5 text-[0.58rem] font-bold uppercase tracking-[0.1em] text-red-300 transition hover:bg-red-500/15"
               >
+                <span className="h-2 w-2 animate-pulse rounded-full bg-red-400" />
+
                 parar transmissão
               </button>
             )}
@@ -1762,20 +1702,22 @@ export default function TransmissionRoomClient({
               onClick={
                 copyInvite
               }
-              className="rounded-xl border border-line-soft px-4 py-2.5 text-[0.62rem] font-bold uppercase tracking-[0.1em] text-text-dim transition hover:border-accent-hot/50 hover:text-accent-hot"
+              className="min-h-11 rounded-xl border border-line-soft bg-bg-deep/25 px-4 py-2.5 text-[0.58rem] font-bold uppercase tracking-[0.1em] text-text-dim transition hover:border-accent-hot/40 hover:text-accent-hot"
             >
-              copiar convite
+              {copiedInvite
+                ? 'copiado ✓'
+                : 'copiar convite'}
             </button>
 
           </div>
 
         </header>
 
-        {/* SALA */}
-        <div className="grid min-h-[650px] overflow-hidden rounded-[22px] border border-line-soft bg-bg-mid/25 lg:grid-cols-[1fr_300px]">
+        {/* CONTEÚDO */}
+        <div className="grid min-h-[680px] overflow-hidden rounded-[24px] border border-line-soft bg-bg-mid/25 shadow-[0_28px_90px_rgba(0,0,0,0.28)] backdrop-blur-lg lg:grid-cols-[minmax(0,1fr)_310px]">
 
-          {/* VÍDEO */}
-          <section className="relative flex min-h-[520px] items-center justify-center overflow-hidden bg-black/90">
+          {/* PLAYER */}
+          <section className="relative flex min-h-[540px] items-center justify-center overflow-hidden bg-black/90">
 
             <video
               ref={
@@ -1793,27 +1735,43 @@ export default function TransmissionRoomClient({
               }`}
             />
 
-            {/* QUEM ESTÁ SENDO ASSISTIDO */}
+            {/* IDENTIFICAÇÃO DA LIVE */}
             {watchingParticipant && (
-              <div className="absolute left-4 top-4 z-[3] flex items-center gap-2 rounded-xl border border-line-soft bg-bg-deep/80 px-3 py-2 backdrop-blur">
+              <div className="absolute left-4 top-4 z-[4] flex items-center gap-3 rounded-2xl border border-line-soft bg-bg-deep/85 px-3 py-2.5 shadow-[0_10px_35px_rgba(0,0,0,0.35)] backdrop-blur-xl">
 
-                <span className="h-2 w-2 rounded-full bg-accent-hot shadow-[0_0_10px_rgba(255,61,129,0.7)]" />
-
-                <span className="text-[0.6rem] font-bold uppercase tracking-[0.12em] text-text-main">
-                  assistindo{' '}
-                  {
+                <UserAvatar
+                  image={
+                    watchingParticipant.image
+                  }
+                  name={
                     watchingParticipant.name
                   }
-                </span>
+                  size={
+                    34
+                  }
+                />
+
+                <div>
+                  <p className="text-[0.66rem] font-semibold text-text-main">
+                    {
+                      watchingParticipant.name
+                    }
+                  </p>
+
+                  <p className="mt-0.5 flex items-center gap-1.5 text-[0.48rem] font-bold uppercase tracking-[0.12em] text-accent-hot">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent-hot" />
+
+                    ao vivo
+                  </p>
+                </div>
 
               </div>
             )}
 
             {/* CONTROLES */}
             {watchingId && (
-              <div className="absolute bottom-4 left-1/2 z-[5] flex w-[calc(100%-2rem)] max-w-[620px] -translate-x-1/2 items-center gap-3 rounded-2xl border border-line-soft bg-bg-deep/85 px-4 py-3 shadow-[0_15px_50px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+              <div className="absolute bottom-4 left-1/2 z-[5] flex w-[calc(100%-2rem)] max-w-[680px] -translate-x-1/2 items-center gap-3 rounded-2xl border border-line-soft bg-bg-deep/90 px-4 py-3 shadow-[0_18px_60px_rgba(0,0,0,0.5)] backdrop-blur-xl">
 
-                {/* MUTE */}
                 <button
                   type="button"
                   onClick={
@@ -1824,14 +1782,13 @@ export default function TransmissionRoomClient({
                       ? 'Ativar áudio'
                       : 'Silenciar'
                   }
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-line-soft text-text-main transition hover:border-accent-hot/50 hover:text-accent-hot"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-line-soft bg-bg-mid/30 text-sm text-text-main transition hover:border-accent-hot/40 hover:text-accent-hot"
                 >
                   {isMuted
                     ? '🔇'
                     : '🔊'}
                 </button>
 
-                {/* VOLUME */}
                 <input
                   type="range"
                   min={0}
@@ -1845,29 +1802,27 @@ export default function TransmissionRoomClient({
                   onChange={
                     changeVolume
                   }
-                  aria-label="Volume da transmissão"
                   className="min-w-0 flex-1 cursor-pointer accent-pink-500"
+                  aria-label="Volume"
                 />
 
-                {/* FULLSCREEN */}
                 <button
                   type="button"
                   onClick={
                     toggleFullscreen
                   }
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-line-soft bg-bg-mid/30 text-sm text-text-main transition hover:border-accent-hot/40 hover:text-accent-hot"
                   title="Tela cheia"
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-line-soft text-text-main transition hover:border-accent-hot/50 hover:text-accent-hot"
                 >
                   ⛶
                 </button>
 
-                {/* SAIR DA LIVE */}
                 <button
                   type="button"
                   onClick={
                     stopWatching
                   }
-                  className="shrink-0 rounded-xl border border-red-400/30 bg-red-500/[0.06] px-3 py-2 text-[0.55rem] font-bold uppercase tracking-[0.1em] text-red-300 transition hover:bg-red-500/15"
+                  className="shrink-0 rounded-xl border border-red-400/30 bg-red-500/[0.06] px-3 py-2.5 text-[0.52rem] font-bold uppercase tracking-[0.09em] text-red-300 transition hover:bg-red-500/15"
                 >
                   sair da live
                 </button>
@@ -1875,49 +1830,54 @@ export default function TransmissionRoomClient({
               </div>
             )}
 
-            {/* TELA DE ESPERA */}
+            {/* EMPTY STATE */}
             {!watchingId && (
-              <div className="relative z-[1] p-8 text-center">
+              <div className="relative z-[2] mx-auto max-w-[500px] px-8 text-center">
 
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-line-soft text-3xl text-text-dim">
+                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[26px] border border-line-soft bg-bg-mid/25 text-3xl text-text-dim shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
                   ▣
                 </div>
 
                 {liveParticipants.length ===
                 0 ? (
                   <>
-                    <h1 className="mt-5 font-display text-3xl text-text-main">
-                      Nenhuma transmissão ativa.
+                    <p className="mt-6 text-[0.55rem] font-bold uppercase tracking-[0.2em] text-accent-hot">
+                      sala pronta
+                    </p>
+
+                    <h1 className="mt-2 font-display text-[2.2rem] text-text-main">
+                      Nenhuma transmissão ativa
                     </h1>
 
-                    <p className="mx-auto mt-3 max-w-[460px] text-[0.78rem] leading-relaxed text-text-dim">
-                      Quando alguém compartilhar a tela,
-                      a transmissão aparecerá na lista ao lado.
+                    <p className="mx-auto mt-3 max-w-[410px] text-[0.76rem] leading-relaxed text-text-dim">
+                      Quando alguém começar a compartilhar a tela,
+                      a transmissão aparecerá na lista de participantes.
                     </p>
                   </>
                 ) : (
                   <>
-                    <h1 className="mt-5 font-display text-3xl text-text-main">
-                      Escolha uma transmissão.
+                    <p className="mt-6 text-[0.55rem] font-bold uppercase tracking-[0.2em] text-accent-hot">
+                      transmissão disponível
+                    </p>
+
+                    <h1 className="mt-2 font-display text-[2.2rem] text-text-main">
+                      Escolha quem assistir
                     </h1>
 
-                    <p className="mx-auto mt-3 max-w-[460px] text-[0.78rem] leading-relaxed text-text-dim">
-                      Existem{' '}
-                      {
-                        liveParticipants.length
-                      }{' '}
+                    <p className="mx-auto mt-3 max-w-[410px] text-[0.76rem] leading-relaxed text-text-dim">
                       {liveParticipants.length ===
                       1
-                        ? 'transmissão ativa'
-                        : 'transmissões ativas'}
-                      . Escolha quem deseja assistir.
+                        ? 'Existe uma pessoa transmitindo agora.'
+                        : `Existem ${liveParticipants.length} pessoas transmitindo agora.`}
                     </p>
                   </>
                 )}
 
                 {isSharing && (
-                  <div className="mx-auto mt-5 inline-flex rounded-full border border-accent-hot/30 bg-accent-hot/[0.08] px-4 py-2 text-[0.58rem] font-bold uppercase tracking-[0.12em] text-accent-hot">
-                    você está transmitindo
+                  <div className="mx-auto mt-6 inline-flex items-center gap-2 rounded-full border border-accent-hot/30 bg-accent-hot/[0.07] px-4 py-2 text-[0.52rem] font-bold uppercase tracking-[0.12em] text-accent-hot">
+                    <span className="h-2 w-2 animate-pulse rounded-full bg-accent-hot" />
+
+                    você está ao vivo
                   </div>
                 )}
 
@@ -1926,57 +1886,53 @@ export default function TransmissionRoomClient({
 
           </section>
 
-          {/* PARTICIPANTES */}
-          <aside className="border-t border-line-soft bg-bg-mid/30 p-5 lg:border-l lg:border-t-0">
+          {/* SIDEBAR */}
+          <aside className="border-t border-line-soft bg-bg-mid/35 lg:border-l lg:border-t-0">
 
-            <div className="flex items-center justify-between gap-4">
+            <div className="border-b border-line-soft px-5 py-5">
 
-              <div>
+              <div className="flex items-center justify-between">
 
-                <p className="text-[0.58rem] font-bold uppercase tracking-[0.18em] text-accent-hot">
-                  na sala
-                </p>
+                <div>
+                  <p className="text-[0.55rem] font-bold uppercase tracking-[0.18em] text-accent-hot">
+                    participantes
+                  </p>
 
-                <p className="mt-1 text-[0.65rem] text-text-dim">
+                  <h2 className="mt-1 font-display text-xl text-text-main">
+                    Na sala
+                  </h2>
+                </div>
+
+                <span className="flex h-9 min-w-9 items-center justify-center rounded-xl border border-line-soft bg-bg-deep/30 px-2 text-[0.68rem] font-bold text-text-main">
                   {
                     participants.length
-                  }{' '}
-                  {participants.length ===
-                  1
-                    ? 'pessoa'
-                    : 'pessoas'}
-                </p>
+                  }
+                </span>
 
               </div>
 
-              <span className="flex h-8 min-w-8 items-center justify-center rounded-full border border-line-soft bg-bg-deep/30 px-2 text-[0.65rem] font-bold text-text-main">
-                {
-                  participants.length
-                }
-              </span>
+              {liveParticipants.length >
+                0 && (
+                <div className="mt-4 flex items-center gap-2 rounded-xl border border-accent-hot/20 bg-accent-hot/[0.05] px-3 py-2">
+
+                  <span className="h-2 w-2 animate-pulse rounded-full bg-accent-hot" />
+
+                  <span className="text-[0.52rem] font-bold uppercase tracking-[0.12em] text-accent-hot">
+                    {
+                      liveParticipants.length
+                    }{' '}
+                    {liveParticipants.length ===
+                    1
+                      ? 'live ativa'
+                      : 'lives ativas'}
+                  </span>
+
+                </div>
+              )}
 
             </div>
 
-            {/* QUANTIDADE DE LIVES */}
-            {liveParticipants.length >
-              0 && (
-              <div className="mt-5 rounded-xl border border-accent-hot/20 bg-accent-hot/[0.04] px-3 py-2.5">
-
-                <p className="text-[0.55rem] font-bold uppercase tracking-[0.14em] text-accent-hot">
-                  {
-                    liveParticipants.length
-                  }{' '}
-                  {liveParticipants.length ===
-                  1
-                    ? 'live ativa'
-                    : 'lives ativas'}
-                </p>
-
-              </div>
-            )}
-
-            {/* LISTA */}
-            <div className="mt-4 flex flex-col gap-2">
+            <div className="max-h-[610px] space-y-2 overflow-y-auto p-4">
 
               {participants.map(
                 (
@@ -1991,56 +1947,85 @@ export default function TransmissionRoomClient({
                     watchingId;
 
                   return (
-                    <div
+                    <article
                       key={
                         participant.id
                       }
-                      className={`rounded-xl border bg-bg-deep/30 px-3 py-3 transition ${
+                      className={`rounded-2xl border p-3 transition ${
                         isWatching
-                          ? 'border-accent-hot/60 shadow-[0_0_20px_rgba(255,61,129,0.08)]'
-                          : 'border-line-soft hover:border-accent-hot/30'
+                          ? 'border-accent-hot/60 bg-accent-hot/[0.05] shadow-[0_0_25px_rgba(255,61,129,0.07)]'
+                          : participant.isSharing
+                            ? 'border-accent-hot/25 bg-bg-deep/35'
+                            : 'border-line-soft bg-bg-deep/25 hover:border-accent-hot/25'
                       }`}
                     >
 
                       <div className="flex items-center gap-3">
 
-                        {/* ONLINE */}
-                        <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_9px_rgba(52,211,153,0.65)]" />
+                        <div className="relative">
 
-                        {/* NOME */}
-                        <div className="min-w-0 flex-1">
-
-                          <p className="truncate text-[0.76rem] text-text-main">
-                            {
+                          <UserAvatar
+                            image={
+                              participant.image
+                            }
+                            name={
                               participant.name
                             }
-                          </p>
+                            size={
+                              42
+                            }
+                          />
 
-                          <p className="mt-0.5 text-[0.55rem] uppercase tracking-[0.11em] text-text-dim">
-                            {participant.isOwner
-                              ? 'dono da sala'
-                              : 'participante'}
-                          </p>
+                          <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-bg-deep bg-emerald-400" />
 
                         </div>
 
-                        {/* VOCÊ */}
-                        {isMe && (
-                          <span className="rounded-full border border-line-soft px-2 py-1 text-[0.48rem] font-bold uppercase tracking-[0.1em] text-text-dim">
-                            você
-                          </span>
-                        )}
+                        <div className="min-w-0 flex-1">
 
-                        {/* LIVE */}
-                        {participant.isSharing && (
-                          <span className="rounded-full border border-accent-hot/30 bg-accent-hot/[0.08] px-2 py-1 text-[0.48rem] font-bold uppercase tracking-[0.1em] text-accent-hot">
-                            live
-                          </span>
-                        )}
+                          <div className="flex min-w-0 items-center gap-2">
+
+                            <p className="truncate text-[0.74rem] font-semibold text-text-main">
+                              {
+                                participant.name
+                              }
+                            </p>
+
+                            {isMe && (
+                              <span className="shrink-0 text-[0.46rem] uppercase tracking-[0.1em] text-text-dim">
+                                você
+                              </span>
+                            )}
+
+                          </div>
+
+                          <div className="mt-1 flex flex-wrap items-center gap-2">
+
+                            {participant.isOwner && (
+                              <span className="rounded-full border border-yellow-400/20 bg-yellow-400/[0.05] px-2 py-0.5 text-[0.43rem] font-bold uppercase tracking-[0.08em] text-yellow-200">
+                                dono
+                              </span>
+                            )}
+
+                            {participant.isSharing && (
+                              <span className="flex items-center gap-1 rounded-full border border-accent-hot/25 bg-accent-hot/[0.06] px-2 py-0.5 text-[0.43rem] font-bold uppercase tracking-[0.08em] text-accent-hot">
+                                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent-hot" />
+
+                                live
+                              </span>
+                            )}
+
+                            {!participant.isSharing && (
+                              <span className="text-[0.46rem] text-text-dim">
+                                online
+                              </span>
+                            )}
+
+                          </div>
+
+                        </div>
 
                       </div>
 
-                      {/* ASSISTIR */}
                       {participant.isSharing &&
                         !isMe && (
                           <button
@@ -2050,10 +2035,10 @@ export default function TransmissionRoomClient({
                                 participant.id,
                               )
                             }
-                            className={`mt-3 w-full rounded-lg border px-3 py-2 text-[0.55rem] font-bold uppercase tracking-[0.1em] transition ${
+                            className={`mt-3 flex min-h-9 w-full items-center justify-center rounded-xl border px-3 py-2 text-[0.5rem] font-bold uppercase tracking-[0.1em] transition ${
                               isWatching
                                 ? 'border-accent-hot bg-accent-hot text-bg-deep'
-                                : 'border-accent-hot/30 bg-accent-hot/[0.06] text-accent-hot hover:bg-accent-hot hover:text-bg-deep'
+                                : 'border-accent-hot/30 bg-accent-hot/[0.05] text-accent-hot hover:bg-accent-hot hover:text-bg-deep'
                             }`}
                           >
                             {isWatching
@@ -2062,7 +2047,7 @@ export default function TransmissionRoomClient({
                           </button>
                         )}
 
-                    </div>
+                    </article>
                   );
                 },
               )}
@@ -2072,6 +2057,16 @@ export default function TransmissionRoomClient({
           </aside>
 
         </div>
+
+        <footer className="mt-3 flex flex-col gap-2 px-2 text-center text-[0.52rem] text-text-dim/45 sm:flex-row sm:items-center sm:justify-between sm:text-left">
+          <span>
+            transmissão privada Grudge
+          </span>
+
+          <span>
+            áudio e vídeo via WebRTC
+          </span>
+        </footer>
 
       </div>
     </main>

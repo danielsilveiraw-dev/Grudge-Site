@@ -5,6 +5,10 @@ import {
 } from 'next/navigation';
 
 import {
+  auth,
+} from '@/auth';
+
+import {
   createTransmissionRoom,
   validateTransmissionRoom,
 } from '@/lib/transmission';
@@ -13,19 +17,11 @@ import {
   createTransmissionSession,
 } from '@/lib/transmission-session';
 
-function cleanName(
-  value: FormDataEntryValue | null,
-) {
-  return (
-    value
-      ?.toString()
-      .trim()
-      .slice(
-        0,
-        28,
-      ) ?? ''
-  );
-}
+type DiscordSessionUser = {
+  name?: string | null;
+  image?: string | null;
+  discordId?: string;
+};
 
 function cleanPassword(
   value: FormDataEntryValue | null,
@@ -41,15 +37,47 @@ function cleanPassword(
   );
 }
 
+async function getDiscordUser() {
+  const session =
+    await auth();
+
+  const user =
+    session?.user as
+      | DiscordSessionUser
+      | undefined;
+
+  if (
+    !user?.discordId
+  ) {
+    redirect(
+      '/transmissao/login',
+    );
+  }
+
+  return {
+    discordId:
+      user.discordId,
+
+    name:
+      user.name
+        ?.trim()
+        .slice(
+          0,
+          64,
+        ) ||
+      'Usuário',
+
+    image:
+      user.image ??
+      null,
+  };
+}
+
 export async function createRoomAction(
   formData: FormData,
 ) {
-  const name =
-    cleanName(
-      formData.get(
-        'name',
-      ),
-    );
+  const user =
+    await getDiscordUser();
 
   const password =
     cleanPassword(
@@ -59,7 +87,6 @@ export async function createRoomAction(
     );
 
   if (
-    name.length < 2 ||
     password.length < 4
   ) {
     redirect(
@@ -70,7 +97,7 @@ export async function createRoomAction(
   const room =
     await createTransmissionRoom({
       ownerName:
-        name,
+        user.name,
 
       password,
     });
@@ -79,7 +106,14 @@ export async function createRoomAction(
     roomCode:
       room.code,
 
-    name,
+    name:
+      user.name,
+
+    discordId:
+      user.discordId,
+
+    image:
+      user.image,
 
     isOwner:
       true,
@@ -93,6 +127,9 @@ export async function createRoomAction(
 export async function joinRoomAction(
   formData: FormData,
 ) {
+  const user =
+    await getDiscordUser();
+
   const code =
     formData
       .get('code')
@@ -100,13 +137,6 @@ export async function joinRoomAction(
       .trim()
       .toUpperCase() ??
     '';
-
-  const name =
-    cleanName(
-      formData.get(
-        'name',
-      ),
-    );
 
   const password =
     cleanPassword(
@@ -117,7 +147,6 @@ export async function joinRoomAction(
 
   if (
     !code ||
-    name.length < 2 ||
     !password
   ) {
     redirect(
@@ -143,7 +172,14 @@ export async function joinRoomAction(
     roomCode:
       result.room.code,
 
-    name,
+    name:
+      user.name,
+
+    discordId:
+      user.discordId,
+
+    image:
+      user.image,
 
     isOwner:
       false,

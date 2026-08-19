@@ -43,13 +43,6 @@ export default async function TransmissionRoomPage({
     );
   }
 
-  /*
-   * Lemos as variáveis NO SERVIDOR.
-   *
-   * Mantemos compatibilidade com
-   * NEXT_PUBLIC_SUPABASE_URI,
-   * que já é usada pelo projeto.
-   */
   const supabaseUrl =
     process.env
       .NEXT_PUBLIC_SUPABASE_URL ||
@@ -62,13 +55,13 @@ export default async function TransmissionRoomPage({
 
   if (!supabaseUrl) {
     throw new Error(
-      'URL do Supabase não está configurada no servidor.',
+      'URL do Supabase não está configurada.',
     );
   }
 
   if (!supabaseAnonKey) {
     throw new Error(
-      'Chave pública do Supabase não está configurada no servidor.',
+      'Chave pública do Supabase não está configurada.',
     );
   }
 
@@ -79,6 +72,12 @@ export default async function TransmissionRoomPage({
       }
       name={
         session.name
+      }
+      discordId={
+        session.discordId
+      }
+      image={
+        session.image
       }
       isOwner={
         session.isOwner
