@@ -63,7 +63,7 @@ export default async function TransmissionLoginPage() {
               grudge // privado
             </p>
 
-            <h1 className="mt-3 font-display text-[clamp(2.4rem,8vw,3.7rem)] uppercase tracking-[0.07em] text-text-main [text-shadow:0_0_35px_rgba(255,61,129,0.25)]">
+            <h1 className="mt-3 font-display text-[clamp(2.5rem,8vw,3.8rem)] font-semibold tracking-[0.02em] text-text-main [text-shadow:0_0_35px_rgba(255,61,129,0.25)]">
               Transmissão
             </h1>
 
@@ -128,8 +128,7 @@ export default async function TransmissionLoginPage() {
 
           <p className="mx-auto mt-5 max-w-[320px] text-center text-[0.58rem] leading-relaxed text-text-dim/55">
             O login serve apenas para identificar os participantes
-            das transmissões. O acesso administrativo continua
-            restrito à staff autorizada.
+            das transmissões..
           </p>
 
         </div>

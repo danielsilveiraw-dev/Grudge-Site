@@ -160,6 +160,16 @@ export default function TransmissionRoomClient({
     setCopiedInvite,
   ] = useState(false);
 
+  const [
+    showRoomCode,
+    setShowRoomCode,
+  ] = useState(true);
+
+  const [
+    copiedRoomCode,
+    setCopiedRoomCode,
+  ] = useState(false);
+
   const watchingIdRef =
     useRef<string | null>(
       null,
@@ -1185,6 +1195,32 @@ export default function TransmissionRoomClient({
     }
   }
 
+  async function copyRoomCode() {
+    try {
+      await navigator.clipboard.writeText(
+        normalizedCode,
+      );
+
+      setCopiedRoomCode(
+        true,
+      );
+
+      window.setTimeout(
+        () => {
+          setCopiedRoomCode(
+            false,
+          );
+        },
+        1800,
+      );
+    } catch (error) {
+      console.error(
+        '[TRANSMISSÃO] Erro ao copiar código:',
+        error,
+      );
+    }
+  }
+
   useEffect(() => {
     const supabase =
       getSupabaseBrowser(
@@ -1607,110 +1643,203 @@ export default function TransmissionRoomClient({
       <div className="relative mx-auto max-w-[1500px]">
 
         {/* CABEÇALHO */}
-        <header className="mb-3 flex flex-col gap-4 rounded-[20px] border border-line-soft bg-bg-mid/35 px-4 py-4 shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur-xl lg:flex-row lg:items-center lg:justify-between">
+        <header className="mb-3 overflow-hidden rounded-[22px] border border-line-soft bg-bg-mid/30 shadow-[0_18px_60px_rgba(0,0,0,0.2)] backdrop-blur-xl">
+          <div className="h-px w-full bg-gradient-to-r from-transparent via-accent-hot/70 to-transparent" />
 
-          <div className="flex min-w-0 items-center gap-4">
+          <div className="flex flex-col gap-4 px-4 py-4 sm:px-5 lg:flex-row lg:items-center lg:justify-between">
+            {/* PERFIL + SALA */}
+            <div className="flex min-w-0 items-center gap-4">
+              <div className="relative">
+                <UserAvatar
+                  image={image}
+                  name={name}
+                  size={48}
+                />
 
-            <UserAvatar
-              image={
-                image
-              }
-              name={
-                name
-              }
-              size={
-                46
-              }
-            />
+                <span
+                  className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-[3px] border-bg-deep ${
+                    connectionStatus === 'connected'
+                      ? 'bg-emerald-400'
+                      : connectionStatus === 'error'
+                        ? 'bg-red-400'
+                        : 'bg-yellow-300'
+                  }`}
+                />
+              </div>
 
-            <div className="min-w-0">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="truncate font-display text-[1.12rem] text-text-main">
+                    {name}
+                  </p>
 
-              <div className="flex flex-wrap items-center gap-2">
+                  {isOwner && (
+                    <span className="rounded-full border border-accent-hot/25 bg-accent-hot/[0.05] px-2 py-0.5 text-[0.44rem] font-bold uppercase tracking-[0.11em] text-accent-hot">
+                      dono
+                    </span>
+                  )}
+                </div>
 
-                <p className="truncate font-display text-[1.05rem] text-text-main">
-                  {name}
-                </p>
-
-                {isOwner && (
-                  <span className="rounded-full border border-accent-hot/30 bg-accent-hot/[0.06] px-2 py-1 text-[0.46rem] font-bold uppercase tracking-[0.11em] text-accent-hot">
-                    dono
+                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <span className="text-[0.5rem] font-bold uppercase tracking-[0.16em] text-text-dim/55">
+                    sala privada
                   </span>
-                )}
 
+                  <span className="flex items-center gap-1.5 text-[0.54rem] text-text-dim">
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        connectionStatus === 'connected'
+                          ? 'bg-emerald-400'
+                          : connectionStatus === 'error'
+                            ? 'bg-red-400'
+                            : 'animate-pulse bg-yellow-300'
+                      }`}
+                    />
+                    {statusLabel}
+                  </span>
+                </div>
               </div>
-
-              <div className="mt-1 flex flex-wrap items-center gap-3">
-
-                <span className="font-mono text-[0.58rem] uppercase tracking-[0.15em] text-text-dim">
-                  sala {normalizedCode}
-                </span>
-
-                <span className="flex items-center gap-2 text-[0.56rem] text-text-dim">
-                  <span
-                    className={`h-2 w-2 rounded-full ${
-                      connectionStatus ===
-                      'connected'
-                        ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.65)]'
-                        : connectionStatus ===
-                          'error'
-                          ? 'bg-red-400'
-                          : 'animate-pulse bg-yellow-300'
-                    }`}
-                  />
-
-                  {statusLabel}
-                </span>
-
-              </div>
-
             </div>
 
-          </div>
+            {/* CÓDIGO + AÇÕES */}
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center lg:justify-end">
+              <div className="flex min-h-11 items-center rounded-xl border border-line-soft bg-bg-deep/30 p-1">
+                <button
+                  type="button"
+                  onClick={copyRoomCode}
+                  title="Copiar código da sala"
+                  className="group flex min-h-9 items-center gap-2 rounded-lg px-3 transition hover:bg-accent-hot/[0.06]"
+                >
+                  <span className="text-[0.45rem] font-bold uppercase tracking-[0.14em] text-text-dim/55">
+                    sala
+                  </span>
 
-          <div className="flex flex-wrap gap-2">
+                  <span className="min-w-[74px] font-mono text-[0.64rem] font-bold tracking-[0.17em] text-text-main transition group-hover:text-accent-hot">
+                    {showRoomCode
+                      ? normalizedCode
+                      : '••••••'}
+                  </span>
 
-            {!isSharing ? (
+                  <span className="text-[0.56rem] text-text-dim transition group-hover:text-accent-hot">
+                    {copiedRoomCode
+                      ? '✓'
+                      : '⧉'}
+                  </span>
+                </button>
+
+                <div className="mx-1 h-5 w-px bg-line-soft" />
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setShowRoomCode(
+                      (current) => !current,
+                    )
+                  }
+                  title={
+                    showRoomCode
+                      ? 'Ocultar código'
+                      : 'Mostrar código'
+                  }
+                  aria-label={
+                    showRoomCode
+                      ? 'Ocultar código da sala'
+                      : 'Mostrar código da sala'
+                  }
+                  className="flex h-9 w-9 items-center justify-center rounded-lg text-text-dim transition hover:bg-accent-hot/[0.06] hover:text-accent-hot"
+                >
+                  {showRoomCode ? (
+                    <svg
+                      width="15"
+                      height="15"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+                      <circle
+                        cx="12"
+                        cy="12"
+                        r="3"
+                      />
+                    </svg>
+                  ) : (
+                    <svg
+                      width="15"
+                      height="15"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="m3 3 18 18" />
+                      <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+                      <path d="M9.9 4.2A10.8 10.8 0 0 1 12 4c6.5 0 10 8 10 8a15 15 0 0 1-2.1 3.2" />
+                      <path d="M6.6 6.6C3.6 8.6 2 12 2 12s3.5 8 10 8a9.8 9.8 0 0 0 4.1-.9" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+
+              {!isSharing ? (
+                <button
+                  type="button"
+                  onClick={startScreenShare}
+                  className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-accent-hot px-4 py-2.5 text-[0.57rem] font-bold uppercase tracking-[0.1em] text-bg-deep transition hover:-translate-y-0.5 hover:brightness-110"
+                >
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <rect
+                      x="3"
+                      y="4"
+                      width="18"
+                      height="13"
+                      rx="2"
+                    />
+                    <path d="M8 21h8" />
+                    <path d="M12 17v4" />
+                  </svg>
+
+                  compartilhar tela
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={stopScreenShare}
+                  className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-red-400/40 bg-red-500/[0.07] px-4 py-2.5 text-[0.57rem] font-bold uppercase tracking-[0.1em] text-red-300 transition hover:bg-red-500/15"
+                >
+                  <span className="h-2 w-2 animate-pulse rounded-full bg-red-400" />
+                  parar transmissão
+                </button>
+              )}
+
               <button
                 type="button"
-                onClick={
-                  startScreenShare
-                }
-                className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-accent-hot px-4 py-2.5 text-[0.58rem] font-bold uppercase tracking-[0.1em] text-bg-deep transition hover:-translate-y-0.5 hover:brightness-110"
+                onClick={copyInvite}
+                className="min-h-11 rounded-xl border border-line-soft bg-bg-deep/20 px-4 py-2.5 text-[0.57rem] font-bold uppercase tracking-[0.1em] text-text-dim transition hover:border-accent-hot/35 hover:bg-accent-hot/[0.04] hover:text-accent-hot"
               >
-                <span>
-                  ▣
-                </span>
-
-                compartilhar tela
+                {copiedInvite
+                  ? 'convite copiado ✓'
+                  : 'copiar convite'}
               </button>
-            ) : (
-              <button
-                type="button"
-                onClick={
-                  stopScreenShare
-                }
-                className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-red-400/40 bg-red-500/[0.07] px-4 py-2.5 text-[0.58rem] font-bold uppercase tracking-[0.1em] text-red-300 transition hover:bg-red-500/15"
-              >
-                <span className="h-2 w-2 animate-pulse rounded-full bg-red-400" />
-
-                parar transmissão
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={
-                copyInvite
-              }
-              className="min-h-11 rounded-xl border border-line-soft bg-bg-deep/25 px-4 py-2.5 text-[0.58rem] font-bold uppercase tracking-[0.1em] text-text-dim transition hover:border-accent-hot/40 hover:text-accent-hot"
-            >
-              {copiedInvite
-                ? 'copiado ✓'
-                : 'copiar convite'}
-            </button>
-
+            </div>
           </div>
-
         </header>
 
         {/* CONTEÚDO */}
@@ -1842,7 +1971,7 @@ export default function TransmissionRoomClient({
                 0 ? (
                   <>
                     <p className="mt-6 text-[0.55rem] font-bold uppercase tracking-[0.2em] text-accent-hot">
-                      sala pronta
+                      aguardando transmissão
                     </p>
 
                     <h1 className="mt-2 font-display text-[2.2rem] text-text-main">
@@ -1894,12 +2023,12 @@ export default function TransmissionRoomClient({
               <div className="flex items-center justify-between">
 
                 <div>
-                  <p className="text-[0.55rem] font-bold uppercase tracking-[0.18em] text-accent-hot">
-                    participantes
+                  <p className="text-[0.52rem] font-bold uppercase tracking-[0.2em] text-accent-hot">
+                    sala privada
                   </p>
 
                   <h2 className="mt-1 font-display text-xl text-text-main">
-                    Na sala
+                    Participantes
                   </h2>
                 </div>
 
@@ -2058,13 +2187,9 @@ export default function TransmissionRoomClient({
 
         </div>
 
-        <footer className="mt-3 flex flex-col gap-2 px-2 text-center text-[0.52rem] text-text-dim/45 sm:flex-row sm:items-center sm:justify-between sm:text-left">
-          <span>
-            transmissão privada Grudge
-          </span>
-
-          <span>
-            áudio e vídeo via WebRTC
+        <footer className="mt-4 text-center">
+          <span className="text-[0.48rem] font-bold uppercase tracking-[0.2em] text-text-dim/30">
+            Grudge • sessão privada
           </span>
         </footer>
 
