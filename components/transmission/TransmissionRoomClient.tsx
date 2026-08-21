@@ -1506,12 +1506,41 @@ export default function TransmissionRoomClient({
   }
 
   async function toggleMicrophone() {
+    soundsUnlockedRef.current =
+      true;
+
     if (
       !voiceReadyRef.current
     ) {
       await startVoice();
-
       return;
+    }
+
+    /*
+     * Se estiver ensurdecido, falar novamente
+     * também reativa o áudio recebido.
+     * Isso evita deixar o estado de voz preso
+     * e mantém os efeitos sonoros funcionando.
+     */
+    if (
+      deafenedRef.current
+    ) {
+      deafenedRef.current =
+        false;
+
+      setDeafened(
+        false,
+      );
+
+      remoteAudioRefs.current.forEach(
+        (audio) => {
+          audio.muted =
+            false;
+
+          audio.volume =
+            1;
+        },
+      );
     }
 
     const next =
@@ -1545,6 +1574,8 @@ export default function TransmissionRoomClient({
                     next,
                   voiceReady:
                     true,
+                  deafened:
+                    false,
                 }
               : participant,
         ),
@@ -1557,9 +1588,6 @@ export default function TransmissionRoomClient({
     );
 
     if (!next) {
-      localSpeakingRef.current =
-        false;
-
       setLocalSpeaking(
         false,
       );
@@ -1571,11 +1599,13 @@ export default function TransmissionRoomClient({
   }
 
   async function toggleDeafen() {
+    soundsUnlockedRef.current =
+      true;
+
     if (
       !voiceReadyRef.current
     ) {
       await startVoice();
-
       return;
     }
 
@@ -1585,15 +1615,25 @@ export default function TransmissionRoomClient({
     deafenedRef.current =
       next;
 
-    remoteAudioElementsRef.current.forEach(
+    setDeafened(
+      next,
+    );
+
+    /*
+     * Ensurdecer controla apenas o áudio
+     * recebido. Não altera o estado real
+     * do microfone.
+     */
+    remoteAudioRefs.current.forEach(
       (audio) => {
         audio.muted =
           next;
-      },
-    );
 
-    setDeafened(
-      next,
+        audio.volume =
+          next
+            ? 0
+            : 1;
+      },
     );
 
     setParticipants(
@@ -1606,6 +1646,8 @@ export default function TransmissionRoomClient({
                   ...participant,
                   deafened:
                     next,
+                  micEnabled:
+                    micEnabledRef.current,
                   voiceReady:
                     true,
                 }
@@ -4462,32 +4504,7 @@ export default function TransmissionRoomClient({
           </div>
 
           {/* SAIR */}
-          <button
-            type="button"
-            onClick={leaveRoom}
-            title="Sair da sala"
-            className="flex min-h-10 w-full items-center justify-center gap-2 rounded-full border border-red-400/22 bg-red-500/[0.05] px-3.5 text-red-300 transition hover:bg-red-500/[0.1] lg:min-h-11 lg:w-auto"
-          >
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.9"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M10 17l5-5-5-5" />
-              <path d="M15 12H3" />
-              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-            </svg>
-
-            <span className="hidden text-[0.42rem] font-bold uppercase tracking-[0.09em] lg:inline">
-              sair da sala
-            </span>
-          </button>
+          
         </footer>
       </div>
     </main>
