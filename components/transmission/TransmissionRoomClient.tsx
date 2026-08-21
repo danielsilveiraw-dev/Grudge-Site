@@ -25,27 +25,13 @@ type UiSound =
   | 'watch-start'
   | 'watch-stop';
 
-const ROOM_SOUNDS: Record<
-  UiSound,
-  string
-> = {
-  join:
-    '/sounds/transmission/join.mp3',
-
-  leave:
-    '/sounds/transmission/leave.mp3',
-
-  mute:
-    '/sounds/transmission/mute.mp3',
-
-  unmute:
-    '/sounds/transmission/unmute.mp3',
-
-  'watch-start':
-    '/sounds/transmission/watch-start.mp3',
-
-  'watch-stop':
-    '/sounds/transmission/watch-stop.mp3',
+const ROOM_SOUNDS: Record<UiSound, string> = {
+  join: '/sounds/transmission/join.mp3',
+  leave: '/sounds/transmission/leave.mp3',
+  mute: '/sounds/transmission/mute.mp3',
+  unmute: '/sounds/transmission/unmute.mp3',
+  'watch-start': '/sounds/transmission/watch-start.mp3',
+  'watch-stop': '/sounds/transmission/watch-stop.mp3',
 };
 
 type Participant = {
@@ -373,18 +359,13 @@ export default function TransmissionRoomClient({
   const soundsUnlockedRef =
     useRef(false);
 
-  const presenceReadyRef =
-    useRef(false);
+  const knownParticipantIdsRef =
+    useRef<Set<string>>(
+      new Set(),
+    );
 
-  const soundPoolRef =
-    useRef<
-      Partial<
-        Record<
-          UiSound,
-          HTMLAudioElement
-        >
-      >
-    >({});
+  const presenceInitializedRef =
+    useRef(false);
 
   const participantId =
     useMemo(() => {
@@ -414,80 +395,29 @@ export default function TransmissionRoomClient({
     sound: UiSound,
   ) {
     if (
-      typeof window ===
-        'undefined' ||
+      typeof window === 'undefined' ||
       !soundsUnlockedRef.current
     ) {
       return;
     }
 
     try {
-      const source =
-        soundPoolRef.current[
-          sound
-        ];
-
       const audio =
-        source
-          ? (source.cloneNode(
-              true,
-            ) as HTMLAudioElement)
-          : new Audio(
-              ROOM_SOUNDS[
-                sound
-              ],
-            );
-
-      audio.volume =
-        0.28;
-
-      void audio
-        .play()
-        .catch(
-          () => {
-            // O navegador pode bloquear
-            // áudio sem interação prévia.
-          },
+        new Audio(
+          ROOM_SOUNDS[sound],
         );
+
+      audio.volume = 0.28;
+
+      void audio.play().catch(
+        () => {
+          // Navegadores podem bloquear áudio
+          // sem interação prévia do usuário.
+        },
+      );
     } catch {
-      // Sons são apenas feedback da interface.
+      // O som é apenas feedback da interface.
     }
-  }
-
-  function presenceHasOtherParticipant(
-    presences: unknown,
-  ) {
-    if (
-      !Array.isArray(
-        presences,
-      )
-    ) {
-      return false;
-    }
-
-    return presences.some(
-      (presence) => {
-        if (
-          !presence ||
-          typeof presence !==
-            'object'
-        ) {
-          return false;
-        }
-
-        const data =
-          presence as {
-            id?: unknown;
-          };
-
-        return (
-          typeof data.id ===
-            'string' &&
-          data.id !==
-            participantId
-        );
-      },
-    );
   }
 
   function closeOutgoingPeer(
@@ -973,11 +903,7 @@ export default function TransmissionRoomClient({
             );
 
           audio.autoplay =
-            true;
-
-          audio.playsInline =
-            true;
-
+                true;
           audio.dataset.voiceParticipant =
             remoteId;
 
@@ -2468,37 +2394,7 @@ export default function TransmissionRoomClient({
   }
 
   useEffect(() => {
-    const sounds =
-      Object.entries(
-        ROOM_SOUNDS,
-      ) as [
-        UiSound,
-        string,
-      ][];
-
-    sounds.forEach(
-      ([
-        key,
-        path,
-      ]) => {
-        const audio =
-          new Audio(
-            path,
-          );
-
-        audio.preload =
-          'auto';
-
-        audio.volume =
-          0.28;
-
-        soundPoolRef.current[
-          key
-        ] = audio;
-      },
-    );
-
-    const unlock =
+    const unlockSounds =
       () => {
         soundsUnlockedRef.current =
           true;
@@ -2506,53 +2402,33 @@ export default function TransmissionRoomClient({
 
     window.addEventListener(
       'pointerdown',
-      unlock,
-      {
-        once:
-          true,
-      },
+      unlockSounds,
     );
 
     window.addEventListener(
       'keydown',
-      unlock,
-      {
-        once:
-          true,
-      },
+      unlockSounds,
     );
 
     return () => {
       window.removeEventListener(
         'pointerdown',
-        unlock,
+        unlockSounds,
       );
 
       window.removeEventListener(
         'keydown',
-        unlock,
+        unlockSounds,
       );
-
-      Object.values(
-        soundPoolRef.current,
-      ).forEach(
-        (audio) => {
-          if (audio) {
-            audio.pause();
-            audio.src =
-              '';
-          }
-        },
-      );
-
-      soundPoolRef.current =
-        {};
     };
   }, []);
 
   useEffect(() => {
-    presenceReadyRef.current =
+    presenceInitializedRef.current =
       false;
+
+    knownParticipantIdsRef.current =
+      new Set();
 
     const supabase =
       getSupabaseBrowser(
@@ -2725,6 +2601,55 @@ export default function TransmissionRoomClient({
         unique,
       );
 
+      const nextIds =
+        new Set(
+          unique.map(
+            (participant) =>
+              participant.id,
+          ),
+        );
+
+      if (
+        presenceInitializedRef.current
+      ) {
+        const previousIds =
+          knownParticipantIdsRef.current;
+
+        const someoneJoined =
+          unique.some(
+            (participant) =>
+              participant.id !==
+                participantId &&
+              !previousIds.has(
+                participant.id,
+              ),
+          );
+
+        const someoneLeft =
+          Array.from(
+            previousIds,
+          ).some(
+            (id) =>
+              id !==
+                participantId &&
+              !nextIds.has(id),
+          );
+
+        if (someoneJoined) {
+          playUiSound('join');
+        }
+
+        if (someoneLeft) {
+          playUiSound('leave');
+        }
+      } else {
+        presenceInitializedRef.current =
+          true;
+      }
+
+      knownParticipantIdsRef.current =
+        nextIds;
+
       if (
         voiceReadyRef.current
       ) {
@@ -2803,18 +2728,7 @@ export default function TransmissionRoomClient({
         event:
           'sync',
       },
-      () => {
-        syncParticipants();
-
-        /*
-         * Só liberamos sons de presença
-         * depois da primeira sincronização.
-         * Isso evita tocar JOIN ao carregar
-         * a própria página.
-         */
-        presenceReadyRef.current =
-          true;
-      },
+      syncParticipants,
     );
 
     channel.on(
@@ -2823,30 +2737,7 @@ export default function TransmissionRoomClient({
         event:
           'join',
       },
-      (payload) => {
-        syncParticipants();
-
-        if (
-          !presenceReadyRef.current
-        ) {
-          return;
-        }
-
-        const data =
-          payload as unknown as {
-            newPresences?: unknown;
-          };
-
-        if (
-          presenceHasOtherParticipant(
-            data.newPresences,
-          )
-        ) {
-          playUiSound(
-            'join',
-          );
-        }
-      },
+      syncParticipants,
     );
 
     channel.on(
@@ -2855,30 +2746,7 @@ export default function TransmissionRoomClient({
         event:
           'leave',
       },
-      (payload) => {
-        syncParticipants();
-
-        if (
-          !presenceReadyRef.current
-        ) {
-          return;
-        }
-
-        const data =
-          payload as unknown as {
-            leftPresences?: unknown;
-          };
-
-        if (
-          presenceHasOtherParticipant(
-            data.leftPresences,
-          )
-        ) {
-          playUiSound(
-            'leave',
-          );
-        }
-      },
+      syncParticipants,
     );
 
     channel.on(
@@ -3153,8 +3021,11 @@ export default function TransmissionRoomClient({
       channelRef.current =
         null;
 
-      presenceReadyRef.current =
+      presenceInitializedRef.current =
         false;
+
+      knownParticipantIdsRef.current =
+        new Set();
     };
   }, [
     normalizedCode,
