@@ -367,15 +367,24 @@ export default function TransmissionRoomClient({
   const presenceInitializedRef =
     useRef(false);
 
-  const lastSoundAtRef =
+  const confirmedPresenceIdsRef =
+    useRef<Set<string>>(
+      new Set(),
+    );
+
+  const presenceSoundTimerRef =
     useRef<
-      Partial<
-        Record<
-          UiSound,
-          number
-        >
-      >
-    >({});
+      ReturnType<
+        typeof setTimeout
+      > | null
+    >(null);
+
+  const watchRetryTimerRef =
+    useRef<
+      ReturnType<
+        typeof setTimeout
+      > | null
+    >(null);
 
   const participantId =
     useMemo(() => {
@@ -411,31 +420,6 @@ export default function TransmissionRoomClient({
       return;
     }
 
-    const now =
-      Date.now();
-
-    const last =
-      lastSoundAtRef.current[
-        sound
-      ] ?? 0;
-
-    const cooldown =
-      sound === 'join' ||
-      sound === 'leave'
-        ? 900
-        : 250;
-
-    if (
-      now - last <
-      cooldown
-    ) {
-      return;
-    }
-
-    lastSoundAtRef.current[
-      sound
-    ] = now;
-
     try {
       const audio =
         new Audio(
@@ -447,8 +431,8 @@ export default function TransmissionRoomClient({
 
       void audio.play().catch(
         () => {
-          // O navegador pode bloquear
-          // áudio sem interação prévia.
+          // Navegadores podem bloquear áudio
+          // sem interação prévia do usuário.
         },
       );
     } catch {
@@ -1977,14 +1961,21 @@ export default function TransmissionRoomClient({
       return;
     }
 
-    playUiSound(
-      'watch-start',
-    );
+    const alreadyWatching =
+      outgoingPeersRef.current.has(
+        viewerId,
+      );
 
     const peer =
       createOutgoingPeer(
         viewerId,
       );
+
+    if (!alreadyWatching) {
+      playUiSound(
+        'watch-start',
+      );
+    }
 
     ensureStreamTracks(
       peer,
@@ -2024,6 +2015,16 @@ export default function TransmissionRoomClient({
     sdp:
       RTCSessionDescriptionInit,
   ) {
+    if (
+      watchRetryTimerRef.current
+    ) {
+      clearTimeout(
+        watchRetryTimerRef.current,
+      );
+
+      watchRetryTimerRef.current =
+        null;
+    }
     if (
       watchingIdRef.current !==
       streamerId
@@ -2301,25 +2302,6 @@ export default function TransmissionRoomClient({
     localStreamRef.current =
       null;
 
-    if (
-      watchingIdRef.current ===
-      participantId
-    ) {
-      if (
-        remoteVideoRef.current
-      ) {
-        remoteVideoRef.current.srcObject =
-          null;
-      }
-
-      watchingIdRef.current =
-        null;
-
-      setWatchingId(
-        null,
-      );
-    }
-
     closeAllOutgoingPeers();
 
     isSharingRef.current =
@@ -2334,54 +2316,64 @@ export default function TransmissionRoomClient({
     );
   }
 
+  async function requestRemoteStream(
+    streamerId: string,
+  ) {
+    await sendSignal({
+      type:
+        'watch-request',
+
+      senderId:
+        participantId,
+
+      targetId:
+        streamerId,
+    });
+
+    if (
+      watchRetryTimerRef.current
+    ) {
+      clearTimeout(
+        watchRetryTimerRef.current,
+      );
+    }
+
+    watchRetryTimerRef.current =
+      setTimeout(
+        () => {
+          if (
+            watchingIdRef.current !==
+              streamerId ||
+            remoteVideoRef.current
+              ?.srcObject
+          ) {
+            return;
+          }
+
+          void sendSignal({
+            type:
+              'watch-request',
+
+            senderId:
+              participantId,
+
+            targetId:
+              streamerId,
+          });
+        },
+        900,
+      );
+  }
+
   async function watchStreamer(
     streamerId: string,
   ) {
     soundsUnlockedRef.current =
       true;
-
     if (
       streamerId ===
       participantId
     ) {
-      const stream =
-        localStreamRef.current;
-
-      if (
-        !stream ||
-        !remoteVideoRef.current
-      ) {
-        return;
-      }
-
-      closeIncomingPeer();
-
-      watchingIdRef.current =
-        participantId;
-
-      setWatchingId(
-        participantId,
-      );
-
-      const video =
-        remoteVideoRef.current;
-
-      video.srcObject =
-        stream;
-
-      video.muted =
-        true;
-
-      setIsMuted(
-        true,
-      );
-
-      void video
-        .play()
-        .catch(
-          () => {},
-        );
-
       return;
     }
 
@@ -2418,27 +2410,28 @@ export default function TransmissionRoomClient({
       streamerId,
     );
 
-    await sendSignal({
-      type:
-        'watch-request',
-
-      senderId:
-        participantId,
-
-      targetId:
-        streamerId,
-    });
-
+    await requestRemoteStream(
+      streamerId,
+    );
   }
 
   async function stopWatching() {
+    if (
+      watchRetryTimerRef.current
+    ) {
+      clearTimeout(
+        watchRetryTimerRef.current,
+      );
+
+      watchRetryTimerRef.current =
+        null;
+    }
+
     const currentWatchingId =
       watchingIdRef.current;
 
     if (
-      currentWatchingId &&
-      currentWatchingId !==
-        participantId
+      currentWatchingId
     ) {
       await sendSignal({
         type:
@@ -2452,19 +2445,7 @@ export default function TransmissionRoomClient({
       });
     }
 
-    if (
-      currentWatchingId ===
-      participantId
-    ) {
-      if (
-        remoteVideoRef.current
-      ) {
-        remoteVideoRef.current.srcObject =
-          null;
-      }
-    } else {
-      closeIncomingPeer();
-    }
+    closeIncomingPeer();
 
     watchingIdRef.current =
       null;
@@ -2472,6 +2453,7 @@ export default function TransmissionRoomClient({
     setWatchingId(
       null,
     );
+
   }
 
   function toggleMute() {
@@ -2734,6 +2716,105 @@ export default function TransmissionRoomClient({
     channelRef.current =
       channel;
 
+    function scheduleConfirmedPresenceSounds() {
+      if (
+        presenceSoundTimerRef.current
+      ) {
+        clearTimeout(
+          presenceSoundTimerRef.current,
+        );
+      }
+
+      presenceSoundTimerRef.current =
+        setTimeout(
+          () => {
+            const state =
+              channel.presenceState();
+
+            const currentIds =
+              new Set<string>();
+
+            Object.entries(
+              state,
+            ).forEach(
+              ([
+                presenceKey,
+                entries,
+              ]) => {
+                entries.forEach(
+                  (entry) => {
+                    const data =
+                      entry as unknown as {
+                        id?: string;
+                      };
+
+                    currentIds.add(
+                      data.id ??
+                        presenceKey,
+                    );
+                  },
+                );
+              },
+            );
+
+            if (
+              !presenceInitializedRef.current
+            ) {
+              confirmedPresenceIdsRef.current =
+                currentIds;
+
+              presenceInitializedRef.current =
+                true;
+
+              return;
+            }
+
+            const previousIds =
+              confirmedPresenceIdsRef.current;
+
+            const someoneJoined =
+              Array.from(
+                currentIds,
+              ).some(
+                (id) =>
+                  id !==
+                    participantId &&
+                  !previousIds.has(
+                    id,
+                  ),
+              );
+
+            const someoneLeft =
+              Array.from(
+                previousIds,
+              ).some(
+                (id) =>
+                  id !==
+                    participantId &&
+                  !currentIds.has(
+                    id,
+                  ),
+              );
+
+            confirmedPresenceIdsRef.current =
+              currentIds;
+
+            if (someoneJoined) {
+              playUiSound(
+                'join',
+              );
+            }
+
+            if (someoneLeft) {
+              playUiSound(
+                'leave',
+              );
+            }
+          },
+          650,
+        );
+    }
+
     function syncParticipants() {
       const state =
         channel.presenceState();
@@ -2852,47 +2933,6 @@ export default function TransmissionRoomClient({
         },
       );
 
-      const hasSelf =
-        nextParticipants.some(
-          (participant) =>
-            participant.id ===
-            participantId,
-        );
-
-      if (!hasSelf) {
-        nextParticipants.push({
-          id:
-            participantId,
-
-          discordId,
-
-          name,
-
-          image,
-
-          isOwner,
-
-          isSharing:
-            isSharingRef.current,
-
-          voiceReady:
-            voiceReadyRef.current,
-
-          micEnabled:
-            micEnabledRef.current,
-
-          deafened:
-            deafenedRef.current,
-
-          isSpeaking:
-            localSpeakingRef.current,
-
-          joinedAt:
-            new Date()
-              .toISOString(),
-        });
-      }
-
       const unique =
         Array.from(
           new Map(
@@ -2945,44 +2985,6 @@ export default function TransmissionRoomClient({
               participant.id,
           ),
         );
-
-      if (
-        presenceInitializedRef.current
-      ) {
-        const previousIds =
-          knownParticipantIdsRef.current;
-
-        const someoneJoined =
-          unique.some(
-            (participant) =>
-              participant.id !==
-                participantId &&
-              !previousIds.has(
-                participant.id,
-              ),
-          );
-
-        const someoneLeft =
-          Array.from(
-            previousIds,
-          ).some(
-            (id) =>
-              id !==
-                participantId &&
-              !nextIds.has(id),
-          );
-
-        if (someoneJoined) {
-          playUiSound('join');
-        }
-
-        if (someoneLeft) {
-          playUiSound('leave');
-        }
-      } else {
-        presenceInitializedRef.current =
-          true;
-      }
 
       knownParticipantIdsRef.current =
         nextIds;
@@ -3040,27 +3042,6 @@ export default function TransmissionRoomClient({
           );
 
         if (
-          currentWatchingId ===
-            participantId
-        ) {
-          if (
-            !isSharingRef.current
-          ) {
-            if (
-              remoteVideoRef.current
-            ) {
-              remoteVideoRef.current.srcObject =
-                null;
-            }
-
-            watchingIdRef.current =
-              null;
-
-            setWatchingId(
-              null,
-            );
-          }
-        } else if (
           !watched ||
           !watched.isSharing
         ) {
@@ -3072,6 +3053,7 @@ export default function TransmissionRoomClient({
           setWatchingId(
             null,
           );
+
         }
       }
     }
@@ -3084,13 +3066,7 @@ export default function TransmissionRoomClient({
       },
       () => {
         syncParticipants();
-
-        if (
-          !presenceInitializedRef.current
-        ) {
-          presenceInitializedRef.current =
-            true;
-        }
+        scheduleConfirmedPresenceSounds();
       },
     );
 
@@ -3102,6 +3078,7 @@ export default function TransmissionRoomClient({
       },
       () => {
         syncParticipants();
+        scheduleConfirmedPresenceSounds();
       },
     );
 
@@ -3113,6 +3090,7 @@ export default function TransmissionRoomClient({
       },
       () => {
         syncParticipants();
+        scheduleConfirmedPresenceSounds();
       },
     );
 
@@ -3146,10 +3124,6 @@ export default function TransmissionRoomClient({
               if (
                 localStreamRef.current
               ) {
-                playUiSound(
-                  'watch-start',
-                );
-
                 await handleWatchRequest(
                   signal.senderId,
                 );
@@ -3159,12 +3133,18 @@ export default function TransmissionRoomClient({
             }
 
             case 'watch-stopped': {
+              const hadViewer =
+                outgoingPeersRef.current.has(
+                  signal.senderId,
+                );
+
               closeOutgoingPeer(
                 signal.senderId,
               );
 
               if (
-                isSharingRef.current
+                isSharingRef.current &&
+                hadViewer
               ) {
                 playUiSound(
                   'watch-stop',
@@ -3400,8 +3380,33 @@ export default function TransmissionRoomClient({
       channelRef.current =
         null;
 
+      if (
+        presenceSoundTimerRef.current
+      ) {
+        clearTimeout(
+          presenceSoundTimerRef.current,
+        );
+
+        presenceSoundTimerRef.current =
+          null;
+      }
+
+      if (
+        watchRetryTimerRef.current
+      ) {
+        clearTimeout(
+          watchRetryTimerRef.current,
+        );
+
+        watchRetryTimerRef.current =
+          null;
+      }
+
       presenceInitializedRef.current =
         false;
+
+      confirmedPresenceIdsRef.current =
+        new Set();
 
       knownParticipantIdsRef.current =
         new Set();
@@ -3972,10 +3977,10 @@ export default function TransmissionRoomClient({
                       <button
                         key={participant.id}
                         type="button"
+                        disabled={isMe}
                         onClick={() =>
-                          watchStreamer(
-                            participant.id,
-                          )
+                          !isMe &&
+                          watchStreamer(participant.id)
                         }
                         className={`group relative min-w-[220px] overflow-hidden rounded-[14px] border text-left transition duration-200 sm:min-w-[240px] lg:min-w-[260px] ${
                           selected
@@ -4026,16 +4031,15 @@ export default function TransmissionRoomClient({
 
                             <p className="mt-1 text-[0.38rem] text-text-dim/40">
                               {isMe
-                                ? selected
-                                  ? 'visualizando sua transmissão'
-                                  : 'clique para visualizar'
+                                ? 'sua transmissão'
                                 : selected
                                   ? 'assistindo agora'
                                   : 'clique para assistir'}
                             </p>
                           </div>
 
-                          <div
+                          {!isMe && (
+                            <div
                               className={`relative z-[1] flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition ${
                                 selected
                                   ? 'border-accent-hot bg-accent-hot text-bg-deep'
@@ -4052,6 +4056,7 @@ export default function TransmissionRoomClient({
                                 <path d="M8 5v14l11-7Z" />
                               </svg>
                             </div>
+                          )}
                         </div>
 
                         <div
@@ -4253,7 +4258,7 @@ export default function TransmissionRoomClient({
                       </div>
 
                       <div className="flex shrink-0 items-center gap-1">
-                        {participant.isSharing && (
+                        {participant.isSharing && !isMe && (
                           <button
                             type="button"
                             onClick={() =>
