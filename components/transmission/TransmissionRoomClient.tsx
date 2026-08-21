@@ -372,13 +372,6 @@ export default function TransmissionRoomClient({
       new Set(),
     );
 
-  const presenceSoundTimerRef =
-    useRef<
-      ReturnType<
-        typeof setTimeout
-      > | null
-    >(null);
-
   const watchRetryTimerRef =
     useRef<
       ReturnType<
@@ -2716,103 +2709,110 @@ export default function TransmissionRoomClient({
     channelRef.current =
       channel;
 
-    function scheduleConfirmedPresenceSounds() {
+    function participantFromPresence(
+      entry: unknown,
+      fallbackId = '',
+    ): Participant | null {
       if (
-        presenceSoundTimerRef.current
+        !entry ||
+        typeof entry !==
+          'object'
       ) {
-        clearTimeout(
-          presenceSoundTimerRef.current,
-        );
+        return null;
       }
 
-      presenceSoundTimerRef.current =
-        setTimeout(
-          () => {
-            const state =
-              channel.presenceState();
+      const data =
+        entry as {
+          id?: string;
+          discordId?: string;
+          name?: string;
+          image?: string | null;
+          isOwner?: boolean;
+          isSharing?: boolean;
+          voiceReady?: boolean;
+          micEnabled?: boolean;
+          deafened?: boolean;
+          isSpeaking?: boolean;
+          joinedAt?: string;
+        };
 
-            const currentIds =
-              new Set<string>();
+      if (!data.name) {
+        return null;
+      }
 
-            Object.entries(
-              state,
-            ).forEach(
-              ([
-                presenceKey,
-                entries,
-              ]) => {
-                entries.forEach(
-                  (entry) => {
-                    const data =
-                      entry as unknown as {
-                        id?: string;
-                      };
+      const id =
+        data.id ??
+        fallbackId;
 
-                    currentIds.add(
-                      data.id ??
-                        presenceKey,
-                    );
-                  },
-                );
-              },
-            );
+      if (!id) {
+        return null;
+      }
 
-            if (
-              !presenceInitializedRef.current
-            ) {
-              confirmedPresenceIdsRef.current =
-                currentIds;
+      return {
+        id,
 
-              presenceInitializedRef.current =
-                true;
+        discordId:
+          data.discordId ??
+          '',
 
-              return;
-            }
+        name:
+          data.name,
 
-            const previousIds =
-              confirmedPresenceIdsRef.current;
+        image:
+          typeof data.image ===
+          'string'
+            ? data.image
+            : null,
 
-            const someoneJoined =
-              Array.from(
-                currentIds,
-              ).some(
-                (id) =>
-                  id !==
-                    participantId &&
-                  !previousIds.has(
-                    id,
-                  ),
-              );
+        isOwner:
+          Boolean(
+            data.isOwner,
+          ),
 
-            const someoneLeft =
-              Array.from(
-                previousIds,
-              ).some(
-                (id) =>
-                  id !==
-                    participantId &&
-                  !currentIds.has(
-                    id,
-                  ),
-              );
+        isSharing:
+          id ===
+          participantId
+            ? isSharingRef.current
+            : Boolean(
+                data.isSharing,
+              ),
 
-            confirmedPresenceIdsRef.current =
-              currentIds;
+        voiceReady:
+          id ===
+          participantId
+            ? voiceReadyRef.current
+            : Boolean(
+                data.voiceReady,
+              ),
 
-            if (someoneJoined) {
-              playUiSound(
-                'join',
-              );
-            }
+        micEnabled:
+          id ===
+          participantId
+            ? micEnabledRef.current
+            : data.micEnabled !==
+                false,
 
-            if (someoneLeft) {
-              playUiSound(
-                'leave',
-              );
-            }
-          },
-          650,
-        );
+        deafened:
+          id ===
+          participantId
+            ? deafenedRef.current
+            : Boolean(
+                data.deafened,
+              ),
+
+        isSpeaking:
+          id ===
+          participantId
+            ? localSpeakingRef.current
+            : Boolean(
+                data.isSpeaking,
+              ),
+
+        joinedAt:
+          data.joinedAt ??
+          new Date()
+            .toISOString(),
+      };
     }
 
     function syncParticipants() {
@@ -2831,103 +2831,17 @@ export default function TransmissionRoomClient({
         ]) => {
           entries.forEach(
             (entry) => {
-              const data =
-                entry as unknown as {
-                  id?: string;
-                  discordId?: string;
-                  name?: string;
-                  image?: string | null;
-                  isOwner?: boolean;
-                  isSharing?: boolean;
-                  voiceReady?: boolean;
-                  micEnabled?: boolean;
-                  deafened?: boolean;
-                  isSpeaking?: boolean;
-                  joinedAt?: string;
-                };
-
-              if (
-                !data.name
-              ) {
-                return;
-              }
-
-              nextParticipants.push({
-                id:
-                  data.id ??
+              const participant =
+                participantFromPresence(
+                  entry,
                   presenceKey,
+                );
 
-                discordId:
-                  data.discordId ??
-                  '',
-
-                name:
-                  data.name,
-
-                image:
-                  typeof data.image ===
-                  'string'
-                    ? data.image
-                    : null,
-
-                isOwner:
-                  Boolean(
-                    data.isOwner,
-                  ),
-
-                isSharing:
-                  (
-                    data.id ===
-                    participantId
-                  )
-                    ? isSharingRef.current
-                    : Boolean(
-                        data.isSharing,
-                      ),
-
-                voiceReady:
-                  (
-                    data.id ===
-                    participantId
-                  )
-                    ? voiceReadyRef.current
-                    : Boolean(
-                        data.voiceReady,
-                      ),
-
-                micEnabled:
-                  (
-                    data.id ===
-                    participantId
-                  )
-                    ? micEnabledRef.current
-                    : data.micEnabled !==
-                        false,
-
-                deafened:
-                  (
-                    data.id ===
-                    participantId
-                  )
-                    ? deafenedRef.current
-                    : Boolean(
-                        data.deafened,
-                      ),
-
-                isSpeaking:
-                  (
-                    data.id ===
-                    participantId
-                  )
-                    ? localSpeakingRef.current
-                    : Boolean(
-                        data.isSpeaking,
-                      ),
-
-                joinedAt:
-                  data.joinedAt ??
-                  '',
-              });
+              if (participant) {
+                nextParticipants.push(
+                  participant,
+                );
+              }
             },
           );
         },
@@ -3066,7 +2980,42 @@ export default function TransmissionRoomClient({
       },
       () => {
         syncParticipants();
-        scheduleConfirmedPresenceSounds();
+
+        if (
+          !presenceInitializedRef.current
+        ) {
+          const currentIds =
+            new Set(
+              Object.values(
+                channel.presenceState(),
+              )
+                .flat()
+                .map(
+                  (entry) =>
+                    participantFromPresence(
+                      entry,
+                    ),
+                )
+                .filter(
+                  (
+                    participant,
+                  ): participant is Participant =>
+                    Boolean(
+                      participant,
+                    ),
+                )
+                .map(
+                  (participant) =>
+                    participant.id,
+                ),
+            );
+
+          confirmedPresenceIdsRef.current =
+            currentIds;
+
+          presenceInitializedRef.current =
+            true;
+        }
       },
     );
 
@@ -3076,9 +3025,124 @@ export default function TransmissionRoomClient({
         event:
           'join',
       },
-      () => {
-        syncParticipants();
-        scheduleConfirmedPresenceSounds();
+      (payload) => {
+        const data =
+          payload as unknown as {
+            newPresences?: unknown[];
+          };
+
+        const joined =
+          (
+            data.newPresences ??
+            []
+          )
+            .map(
+              (entry) =>
+                participantFromPresence(
+                  entry,
+                ),
+            )
+            .filter(
+              (
+                participant,
+              ): participant is Participant =>
+                Boolean(
+                  participant,
+                ),
+            );
+
+        if (
+          joined.length > 0
+        ) {
+          setParticipants(
+            (current) => {
+              const map =
+                new Map(
+                  current.map(
+                    (participant) => [
+                      participant.id,
+                      participant,
+                    ],
+                  ),
+                );
+
+              joined.forEach(
+                (participant) => {
+                  map.set(
+                    participant.id,
+                    participant,
+                  );
+                },
+              );
+
+              return Array.from(
+                map.values(),
+              ).sort(
+                (a, b) => {
+                  if (
+                    a.isSharing !==
+                    b.isSharing
+                  ) {
+                    return a.isSharing
+                      ? -1
+                      : 1;
+                  }
+
+                  if (
+                    a.isOwner !==
+                    b.isOwner
+                  ) {
+                    return a.isOwner
+                      ? -1
+                      : 1;
+                  }
+
+                  return a.name.localeCompare(
+                    b.name,
+                    'pt-BR',
+                  );
+                },
+              );
+            },
+          );
+
+          const realNewJoin =
+            joined.some(
+              (participant) =>
+                participant.id !==
+                  participantId &&
+                !confirmedPresenceIdsRef.current.has(
+                  participant.id,
+                ),
+            );
+
+          joined.forEach(
+            (participant) =>
+              confirmedPresenceIdsRef.current.add(
+                participant.id,
+              ),
+          );
+
+          if (
+            presenceInitializedRef.current &&
+            realNewJoin
+          ) {
+            playUiSound(
+              'join',
+            );
+          }
+        }
+
+        /*
+         * O Presence State pode atualizar
+         * alguns ms depois do evento join.
+         * Este sync atrasado corrige qualquer
+         * diferença sem apagar o usuário novo.
+         */
+        window.setTimeout(
+          syncParticipants,
+          180,
+        );
       },
     );
 
@@ -3088,9 +3152,84 @@ export default function TransmissionRoomClient({
         event:
           'leave',
       },
-      () => {
-        syncParticipants();
-        scheduleConfirmedPresenceSounds();
+      (payload) => {
+        const data =
+          payload as unknown as {
+            leftPresences?: unknown[];
+          };
+
+        const leftIds =
+          (
+            data.leftPresences ??
+            []
+          )
+            .map(
+              (entry) => {
+                if (
+                  !entry ||
+                  typeof entry !==
+                    'object'
+                ) {
+                  return '';
+                }
+
+                const presence =
+                  entry as {
+                    id?: string;
+                  };
+
+                return (
+                  presence.id ??
+                  ''
+                );
+              },
+            )
+            .filter(Boolean);
+
+        if (
+          leftIds.length > 0
+        ) {
+          setParticipants(
+            (current) =>
+              current.filter(
+                (participant) =>
+                  !leftIds.includes(
+                    participant.id,
+                  ),
+              ),
+          );
+
+          const realLeave =
+            leftIds.some(
+              (id) =>
+                id !==
+                  participantId &&
+                confirmedPresenceIdsRef.current.has(
+                  id,
+                ),
+            );
+
+          leftIds.forEach(
+            (id) =>
+              confirmedPresenceIdsRef.current.delete(
+                id,
+              ),
+          );
+
+          if (
+            presenceInitializedRef.current &&
+            realLeave
+          ) {
+            playUiSound(
+              'leave',
+            );
+          }
+        }
+
+        window.setTimeout(
+          syncParticipants,
+          180,
+        );
       },
     );
 
@@ -3379,17 +3518,6 @@ export default function TransmissionRoomClient({
 
       channelRef.current =
         null;
-
-      if (
-        presenceSoundTimerRef.current
-      ) {
-        clearTimeout(
-          presenceSoundTimerRef.current,
-        );
-
-        presenceSoundTimerRef.current =
-          null;
-      }
 
       if (
         watchRetryTimerRef.current
