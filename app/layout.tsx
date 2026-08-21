@@ -1,4 +1,6 @@
-import type { Metadata } from 'next';
+import type {
+  Metadata,
+} from 'next';
 
 import {
   Cormorant_Garamond,
@@ -7,35 +9,65 @@ import {
 
 import './globals.css';
 
+import AppChrome from '@/components/AppChrome';
 import GhostLetters from '@/components/GhostLetters';
-import GlobalPlayer from '@/components/GlobalPlayer';
-import SideMenu from '@/components/SideMenu';
 
-import { getSongs } from '@/lib/music';
+import {
+  getSongs,
+} from '@/lib/music';
 
-export const dynamic = 'force-dynamic';
+export const dynamic =
+  'force-dynamic';
 
-const display = Cormorant_Garamond({
-  subsets: ['latin'],
-  weight: ['500', '600'],
-  style: ['normal', 'italic'],
-  variable: '--font-display',
-});
+const display =
+  Cormorant_Garamond({
+    subsets: [
+      'latin',
+    ],
 
-const body = Manrope({
-  subsets: ['latin'],
-  weight: ['400', '500', '700'],
-  variable: '--font-body',
-});
+    weight: [
+      '500',
+      '600',
+    ],
 
-export const metadata: Metadata = {
-  metadataBase: new URL(
-    'https://grudge.com.br',
-  ),
+    style: [
+      'normal',
+      'italic',
+    ],
+
+    variable:
+      '--font-display',
+  });
+
+const body =
+  Manrope({
+    subsets: [
+      'latin',
+    ],
+
+    weight: [
+      '400',
+      '500',
+      '700',
+    ],
+
+    variable:
+      '--font-body',
+  });
+
+export const metadata:
+  Metadata = {
+  metadataBase:
+    new URL(
+      'https://grudge.com.br',
+    ),
 
   title: {
-    default: 'GRUDGE SMP',
-    template: '%s | GRUDGE SMP',
+    default:
+      'GRUDGE SMP',
+
+    template:
+      '%s | GRUDGE SMP',
   },
 
   description:
@@ -45,37 +77,52 @@ export const metadata: Metadata = {
     'GRUDGE SMP',
 
   alternates: {
-    canonical: '/',
+    canonical:
+      '/',
   },
 
   openGraph: {
-    type: 'website',
+    type:
+      'website',
 
-    locale: 'pt_BR',
+    locale:
+      'pt_BR',
 
-    url: 'https://grudge.com.br',
+    url:
+      'https://grudge.com.br',
 
-    siteName: 'GRUDGE SMP',
+    siteName:
+      'GRUDGE SMP',
 
-    title: 'GRUDGE SMP',
+    title:
+      'GRUDGE SMP',
 
     description:
       'Entre no caos. Descubra o desconhecido.',
 
     images: [
       {
-        url: '/assets/grudge-logo.png',
-        width: 1536,
-        height: 512,
-        alt: 'GRUDGE SMP',
+        url:
+          '/assets/grudge-logo.png',
+
+        width:
+          1536,
+
+        height:
+          512,
+
+        alt:
+          'GRUDGE SMP',
       },
     ],
   },
 
   twitter: {
-    card: 'summary_large_image',
+    card:
+      'summary_large_image',
 
-    title: 'GRUDGE SMP',
+    title:
+      'GRUDGE SMP',
 
     description:
       'Entre no caos. Descubra o desconhecido.',
@@ -86,15 +133,19 @@ export const metadata: Metadata = {
   },
 
   robots: {
-    index: true,
-    follow: true,
+    index:
+      true,
+
+    follow:
+      true,
   },
 };
 
 export default async function RootLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children:
+    React.ReactNode;
 }) {
   const songs =
     await getSongs();
@@ -107,13 +158,11 @@ export default async function RootLayout({
       <body>
         <GhostLetters />
 
-        <SideMenu />
-
-        {children}
-
-        <GlobalPlayer
+        <AppChrome
           songs={songs}
         />
+
+        {children}
       </body>
     </html>
   );
