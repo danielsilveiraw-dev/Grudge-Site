@@ -367,6 +367,16 @@ export default function TransmissionRoomClient({
   const presenceInitializedRef =
     useRef(false);
 
+  const lastSoundAtRef =
+    useRef<
+      Partial<
+        Record<
+          UiSound,
+          number
+        >
+      >
+    >({});
+
   const participantId =
     useMemo(() => {
       if (
@@ -401,6 +411,31 @@ export default function TransmissionRoomClient({
       return;
     }
 
+    const now =
+      Date.now();
+
+    const last =
+      lastSoundAtRef.current[
+        sound
+      ] ?? 0;
+
+    const cooldown =
+      sound === 'join' ||
+      sound === 'leave'
+        ? 900
+        : 250;
+
+    if (
+      now - last <
+      cooldown
+    ) {
+      return;
+    }
+
+    lastSoundAtRef.current[
+      sound
+    ] = now;
+
     try {
       const audio =
         new Audio(
@@ -412,8 +447,8 @@ export default function TransmissionRoomClient({
 
       void audio.play().catch(
         () => {
-          // Navegadores podem bloquear áudio
-          // sem interação prévia do usuário.
+          // O navegador pode bloquear
+          // áudio sem interação prévia.
         },
       );
     } catch {
@@ -2266,6 +2301,25 @@ export default function TransmissionRoomClient({
     localStreamRef.current =
       null;
 
+    if (
+      watchingIdRef.current ===
+      participantId
+    ) {
+      if (
+        remoteVideoRef.current
+      ) {
+        remoteVideoRef.current.srcObject =
+          null;
+      }
+
+      watchingIdRef.current =
+        null;
+
+      setWatchingId(
+        null,
+      );
+    }
+
     closeAllOutgoingPeers();
 
     isSharingRef.current =
@@ -2285,10 +2339,49 @@ export default function TransmissionRoomClient({
   ) {
     soundsUnlockedRef.current =
       true;
+
     if (
       streamerId ===
       participantId
     ) {
+      const stream =
+        localStreamRef.current;
+
+      if (
+        !stream ||
+        !remoteVideoRef.current
+      ) {
+        return;
+      }
+
+      closeIncomingPeer();
+
+      watchingIdRef.current =
+        participantId;
+
+      setWatchingId(
+        participantId,
+      );
+
+      const video =
+        remoteVideoRef.current;
+
+      video.srcObject =
+        stream;
+
+      video.muted =
+        true;
+
+      setIsMuted(
+        true,
+      );
+
+      void video
+        .play()
+        .catch(
+          () => {},
+        );
+
       return;
     }
 
@@ -2343,7 +2436,9 @@ export default function TransmissionRoomClient({
       watchingIdRef.current;
 
     if (
-      currentWatchingId
+      currentWatchingId &&
+      currentWatchingId !==
+        participantId
     ) {
       await sendSignal({
         type:
@@ -2357,7 +2452,19 @@ export default function TransmissionRoomClient({
       });
     }
 
-    closeIncomingPeer();
+    if (
+      currentWatchingId ===
+      participantId
+    ) {
+      if (
+        remoteVideoRef.current
+      ) {
+        remoteVideoRef.current.srcObject =
+          null;
+      }
+    } else {
+      closeIncomingPeer();
+    }
 
     watchingIdRef.current =
       null;
@@ -2365,7 +2472,6 @@ export default function TransmissionRoomClient({
     setWatchingId(
       null,
     );
-
   }
 
   function toggleMute() {
@@ -2746,6 +2852,47 @@ export default function TransmissionRoomClient({
         },
       );
 
+      const hasSelf =
+        nextParticipants.some(
+          (participant) =>
+            participant.id ===
+            participantId,
+        );
+
+      if (!hasSelf) {
+        nextParticipants.push({
+          id:
+            participantId,
+
+          discordId,
+
+          name,
+
+          image,
+
+          isOwner,
+
+          isSharing:
+            isSharingRef.current,
+
+          voiceReady:
+            voiceReadyRef.current,
+
+          micEnabled:
+            micEnabledRef.current,
+
+          deafened:
+            deafenedRef.current,
+
+          isSpeaking:
+            localSpeakingRef.current,
+
+          joinedAt:
+            new Date()
+              .toISOString(),
+        });
+      }
+
       const unique =
         Array.from(
           new Map(
@@ -2893,6 +3040,27 @@ export default function TransmissionRoomClient({
           );
 
         if (
+          currentWatchingId ===
+            participantId
+        ) {
+          if (
+            !isSharingRef.current
+          ) {
+            if (
+              remoteVideoRef.current
+            ) {
+              remoteVideoRef.current.srcObject =
+                null;
+            }
+
+            watchingIdRef.current =
+              null;
+
+            setWatchingId(
+              null,
+            );
+          }
+        } else if (
           !watched ||
           !watched.isSharing
         ) {
@@ -2904,7 +3072,6 @@ export default function TransmissionRoomClient({
           setWatchingId(
             null,
           );
-
         }
       }
     }
@@ -2935,14 +3102,6 @@ export default function TransmissionRoomClient({
       },
       () => {
         syncParticipants();
-
-        if (
-          presenceInitializedRef.current
-        ) {
-          playUiSound(
-            'join',
-          );
-        }
       },
     );
 
@@ -2954,14 +3113,6 @@ export default function TransmissionRoomClient({
       },
       () => {
         syncParticipants();
-
-        if (
-          presenceInitializedRef.current
-        ) {
-          playUiSound(
-            'leave',
-          );
-        }
       },
     );
 
@@ -3821,10 +3972,10 @@ export default function TransmissionRoomClient({
                       <button
                         key={participant.id}
                         type="button"
-                        disabled={isMe}
                         onClick={() =>
-                          !isMe &&
-                          watchStreamer(participant.id)
+                          watchStreamer(
+                            participant.id,
+                          )
                         }
                         className={`group relative min-w-[220px] overflow-hidden rounded-[14px] border text-left transition duration-200 sm:min-w-[240px] lg:min-w-[260px] ${
                           selected
@@ -3875,15 +4026,16 @@ export default function TransmissionRoomClient({
 
                             <p className="mt-1 text-[0.38rem] text-text-dim/40">
                               {isMe
-                                ? 'sua transmissão'
+                                ? selected
+                                  ? 'visualizando sua transmissão'
+                                  : 'clique para visualizar'
                                 : selected
                                   ? 'assistindo agora'
                                   : 'clique para assistir'}
                             </p>
                           </div>
 
-                          {!isMe && (
-                            <div
+                          <div
                               className={`relative z-[1] flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition ${
                                 selected
                                   ? 'border-accent-hot bg-accent-hot text-bg-deep'
@@ -3900,7 +4052,6 @@ export default function TransmissionRoomClient({
                                 <path d="M8 5v14l11-7Z" />
                               </svg>
                             </div>
-                          )}
                         </div>
 
                         <div
@@ -4102,7 +4253,7 @@ export default function TransmissionRoomClient({
                       </div>
 
                       <div className="flex shrink-0 items-center gap-1">
-                        {participant.isSharing && !isMe && (
+                        {participant.isSharing && (
                           <button
                             type="button"
                             onClick={() =>
