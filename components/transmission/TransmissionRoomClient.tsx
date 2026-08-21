@@ -1288,6 +1288,9 @@ export default function TransmissionRoomClient({
   }
 
   async function startVoice() {
+    soundsUnlockedRef.current =
+      true;
+
     if (
       voiceReadyRef.current
     ) {
@@ -2114,6 +2117,9 @@ export default function TransmissionRoomClient({
   }
 
   async function startScreenShare() {
+    soundsUnlockedRef.current =
+      true;
+
     if (
       isSharingRef.current
     ) {
@@ -2235,6 +2241,8 @@ export default function TransmissionRoomClient({
   async function watchStreamer(
     streamerId: string,
   ) {
+    soundsUnlockedRef.current =
+      true;
     if (
       streamerId ===
       participantId
@@ -2865,7 +2873,16 @@ export default function TransmissionRoomClient({
         event:
           'sync',
       },
-      syncParticipants,
+      () => {
+        syncParticipants();
+
+        if (
+          !presenceInitializedRef.current
+        ) {
+          presenceInitializedRef.current =
+            true;
+        }
+      },
     );
 
     channel.on(
@@ -2874,7 +2891,17 @@ export default function TransmissionRoomClient({
         event:
           'join',
       },
-      syncParticipants,
+      () => {
+        syncParticipants();
+
+        if (
+          presenceInitializedRef.current
+        ) {
+          playUiSound(
+            'join',
+          );
+        }
+      },
     );
 
     channel.on(
@@ -2883,7 +2910,17 @@ export default function TransmissionRoomClient({
         event:
           'leave',
       },
-      syncParticipants,
+      () => {
+        syncParticipants();
+
+        if (
+          presenceInitializedRef.current
+        ) {
+          playUiSound(
+            'leave',
+          );
+        }
+      },
     );
 
     channel.on(
@@ -2916,6 +2953,10 @@ export default function TransmissionRoomClient({
               if (
                 localStreamRef.current
               ) {
+                playUiSound(
+                  'watch-start',
+                );
+
                 await handleWatchRequest(
                   signal.senderId,
                 );
@@ -3236,22 +3277,22 @@ export default function TransmissionRoomClient({
       <div className="pointer-events-none absolute left-1/2 top-[-180px] h-[520px] w-[900px] -translate-x-1/2 rounded-full bg-accent-hot/[0.045] blur-[180px]" />
       <div className="pointer-events-none absolute bottom-[-220px] left-[20%] h-[500px] w-[500px] rounded-full bg-accent-hot/[0.025] blur-[170px]" />
 
-      <div className="relative mx-auto flex min-h-[calc(100vh-1rem)] max-w-[1840px] flex-col sm:min-h-[calc(100vh-1.5rem)] lg:min-h-[calc(100vh-2rem)]">
+      <div className="relative mx-auto flex min-h-[calc(100vh-1rem)] max-w-[1880px] flex-col sm:min-h-[calc(100vh-1.5rem)] lg:min-h-[calc(100vh-2rem)]">
         {/* TOPBAR */}
-        <header className="mb-3 overflow-hidden rounded-[18px] border border-white/[0.07] bg-[#0f0f12]/92 shadow-[0_14px_55px_rgba(0,0,0,0.3)] backdrop-blur-xl">
-          <div className="h-px w-full bg-gradient-to-r from-transparent via-accent-hot/45 to-transparent" />
+        <header className="mb-3 overflow-hidden rounded-[18px] border border-accent-hot/20 bg-[#0f0f12]/94 shadow-[0_14px_55px_rgba(0,0,0,0.3)] backdrop-blur-xl">
+          <div className="h-px w-full bg-gradient-to-r from-transparent via-accent-hot/75 to-transparent" />
 
-          <div className="flex min-h-[72px] flex-wrap items-center justify-between gap-3 px-4 py-3.5 sm:min-h-[62px] sm:gap-3 sm:px-4 sm:py-3 lg:px-5">
+          <div className="flex min-h-[82px] flex-wrap items-center justify-between gap-3 px-4 py-3.5 sm:min-h-[62px] sm:gap-3 sm:px-4 sm:py-3 lg:px-5">
             {/* IDENTIDADE */}
             <div className="flex min-w-0 items-center gap-3">
-              <div className="relative flex h-12 min-w-[138px] items-center rounded-xl border border-white/[0.06] bg-black/15 px-3">
+              <div className="relative flex h-14 min-w-[220px] items-center rounded-xl border border-white/[0.06] bg-black/15 px-3">
                 <Image
                   src="/assets/grudge-logo.png"
                   alt="GRUDGE SMP"
                   width={1536}
                   height={512}
                   priority
-                  className="h-8 w-auto max-w-[150px] object-contain object-left"
+                  className="h-10 w-auto max-w-[180px] object-contain object-left"
                 />
 
                 <span
@@ -3267,13 +3308,13 @@ export default function TransmissionRoomClient({
 
               <div className="min-w-0">
                 <div className="flex min-w-0 items-center gap-2">
-                  <span className="hidden text-[0.42rem] font-bold uppercase tracking-[0.17em] text-text-dim/45 sm:inline">
+                  <span className="hidden text-[0.54rem] font-bold uppercase tracking-[0.15em] text-accent-hot/85 sm:inline">
                     transmissão privada
                   </span>
                 </div>
 
                 <div className="mt-0.5 flex items-center gap-2">
-                  <span className="text-[0.44rem] uppercase tracking-[0.1em] text-text-dim/45">
+                  <span className="text-[0.54rem] uppercase tracking-[0.08em] text-text-dim/65">
                     {statusLabel}
                   </span>
 
@@ -3315,7 +3356,7 @@ export default function TransmissionRoomClient({
                     sala
                   </span>
 
-                  <span className="min-w-[72px] font-mono text-[0.61rem] font-bold tracking-[0.19em] text-text-main transition group-hover:text-accent-hot">
+                  <span className="min-w-[72px] font-mono text-[0.74rem] font-bold tracking-[0.16em] text-text-main transition group-hover:text-accent-hot">
                     {showRoomCode
                       ? normalizedCode
                       : '••••••'}
@@ -3446,10 +3487,10 @@ export default function TransmissionRoomClient({
         </header>
 
         {/* ÁREA PRINCIPAL */}
-        <div className="grid min-h-0 flex-1 gap-2.5 lg:grid-cols-[minmax(0,1fr)_330px] lg:gap-3">
+        <div className="grid min-h-0 flex-1 gap-2.5 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-3">
           <section className="flex min-h-0 flex-col gap-3">
             {/* PALCO */}
-            <div className="group/stage relative min-h-[360px] flex-1 overflow-hidden rounded-[16px] border border-white/[0.07] bg-[#050506] shadow-[0_24px_90px_rgba(0,0,0,0.32)] sm:min-h-[440px] sm:rounded-[18px] lg:min-h-[540px] lg:rounded-[20px]">
+            <div className="group/stage relative min-h-[430px] flex-1 overflow-hidden rounded-[16px] border border-accent-hot/22 bg-[#050506] shadow-[0_24px_90px_rgba(0,0,0,0.32)] sm:min-h-[500px] sm:rounded-[18px] lg:min-h-[620px] lg:rounded-[20px]">
               <div className="pointer-events-none absolute inset-0 z-[1] bg-[radial-gradient(circle_at_50%_0%,rgba(255,61,129,0.06),transparent_36%)]" />
 
               <video
@@ -3543,19 +3584,19 @@ export default function TransmissionRoomClient({
                       </svg>
                     </div>
 
-                    <p className="mt-5 text-[0.45rem] font-bold uppercase tracking-[0.21em] text-accent-hot/90">
+                    <p className="mt-5 text-[0.58rem] font-bold uppercase tracking-[0.18em] text-accent-hot">
                       {liveParticipants.length
                         ? 'transmissão disponível'
                         : 'sala conectada'}
                     </p>
 
-                    <h1 className="mt-2 font-display text-[clamp(1.9rem,4vw,2.9rem)] text-text-main">
+                    <h1 className="mt-2 font-display text-[clamp(2.15rem,4.5vw,3.4rem)] text-text-main">
                       {liveParticipants.length
                         ? 'Escolha uma transmissão'
                         : 'Aguardando uma transmissão'}
                     </h1>
 
-                    <p className="mx-auto mt-2 max-w-[380px] text-[0.69rem] leading-relaxed text-text-dim">
+                    <p className="mx-auto mt-2 max-w-[380px] text-[0.82rem] leading-relaxed text-text-dim/85">
                       {liveParticipants.length
                         ? 'Selecione uma pessoa ao vivo na lateral ou na faixa abaixo.'
                         : 'Quando alguém compartilhar a tela, a transmissão aparecerá aqui.'}
@@ -3693,7 +3734,7 @@ export default function TransmissionRoomClient({
             </div>
 
             {/* FAIXA DE TRANSMISSÕES */}
-            <div className="rounded-[16px] border border-white/[0.07] bg-[#111114]/78 p-2.5 shadow-[0_16px_50px_rgba(0,0,0,0.16)] sm:rounded-[18px] sm:p-3">
+            <div className="rounded-[16px] border border-accent-hot/14 bg-[#111114]/82 p-2.5 shadow-[0_16px_50px_rgba(0,0,0,0.16)] sm:rounded-[18px] sm:p-3">
               <div className="mb-2.5 flex items-center justify-between gap-3">
                 <div>
                   <p className="text-[0.39rem] font-bold uppercase tracking-[0.18em] text-accent-hot/80">
@@ -3743,10 +3784,10 @@ export default function TransmissionRoomClient({
                           !isMe &&
                           watchStreamer(participant.id)
                         }
-                        className={`group relative min-w-[170px] overflow-hidden rounded-[14px] border text-left transition duration-200 sm:min-w-[190px] lg:min-w-[210px] ${
+                        className={`group relative min-w-[220px] overflow-hidden rounded-[14px] border text-left transition duration-200 sm:min-w-[240px] lg:min-w-[260px] ${
                           selected
                             ? 'border-accent-hot/55 bg-accent-hot/[0.055] shadow-[0_0_28px_rgba(255,61,129,0.06)]'
-                            : 'border-white/[0.07] bg-black/[0.16] hover:border-accent-hot/28 hover:bg-black/[0.24]'
+                            : 'border-accent-hot/12 bg-black/[0.18] hover:border-accent-hot/35 hover:bg-black/[0.24]'
                         } ${
                           isMe
                             ? 'cursor-default'
@@ -3836,15 +3877,15 @@ export default function TransmissionRoomClient({
           </section>
 
           {/* SIDEBAR DE PARTICIPANTES */}
-          <aside className="flex max-h-[48vh] min-h-[320px] flex-col overflow-hidden rounded-[16px] border border-white/[0.07] bg-[#111114]/84 shadow-[0_20px_70px_rgba(0,0,0,0.18)] sm:max-h-[54vh] sm:min-h-[370px] sm:rounded-[18px] lg:max-h-none lg:min-h-[400px] lg:rounded-[20px]">
+          <aside className="flex max-h-[54vh] min-h-[360px] flex-col overflow-hidden rounded-[16px] border border-accent-hot/14 bg-[#111114]/88 shadow-[0_20px_70px_rgba(0,0,0,0.18)] sm:max-h-[58vh] sm:min-h-[420px] sm:rounded-[18px] lg:max-h-none lg:min-h-[400px] lg:rounded-[20px]">
             <div className="border-b border-white/[0.07] px-3 py-3 sm:px-4 sm:py-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-[0.4rem] font-bold uppercase tracking-[0.19em] text-accent-hot/85">
+                  <p className="text-[0.52rem] font-bold uppercase tracking-[0.17em] text-accent-hot">
                     sala privada
                   </p>
 
-                  <h2 className="mt-1 font-display text-[1.08rem] text-text-main">
+                  <h2 className="mt-1 font-display text-[1.28rem] text-text-main">
                     Participantes
                   </h2>
                 </div>
@@ -3856,7 +3897,7 @@ export default function TransmissionRoomClient({
                     </span>
                   )}
 
-                  <span className="flex h-8 min-w-8 items-center justify-center rounded-lg border border-white/[0.07] bg-black/20 px-2 text-[0.56rem] font-bold text-text-main">
+                  <span className="flex h-8 min-w-8 items-center justify-center rounded-lg border border-white/[0.07] bg-black/20 px-2 text-[0.68rem] font-bold text-text-main">
                     {participants.length}
                   </span>
                 </div>
@@ -3906,7 +3947,7 @@ export default function TransmissionRoomClient({
 
                       <div className="min-w-0 flex-1">
                         <div className="flex min-w-0 items-center gap-1.5">
-                          <p className="truncate text-[0.62rem] font-semibold text-text-main">
+                          <p className="truncate text-[0.74rem] font-semibold text-text-main">
                             {participant.name}
                           </p>
 
@@ -3928,13 +3969,13 @@ export default function TransmissionRoomClient({
 
                         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
                           {isActivelySpeaking ? (
-                            <span className="flex items-center gap-1 text-[0.39rem] font-bold uppercase tracking-[0.08em] text-emerald-300">
+                            <span className="flex items-center gap-1 text-[0.48rem] font-bold uppercase tracking-[0.08em] text-emerald-300">
                               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
                               falando
                             </span>
                           ) : participant.voiceReady ? (
                             <span
-                              className={`flex items-center gap-1 text-[0.39rem] ${
+                              className={`flex items-center gap-1 text-[0.48rem] ${
                                 participant.micEnabled
                                   ? 'text-text-dim/55'
                                   : 'text-red-300/75'
@@ -3980,7 +4021,7 @@ export default function TransmissionRoomClient({
                                 : 'mic mutado'}
                             </span>
                           ) : (
-                            <span className="text-[0.39rem] text-text-dim/45">
+                            <span className="text-[0.48rem] text-text-dim/55">
                               online
                             </span>
                           )}
@@ -3988,7 +4029,7 @@ export default function TransmissionRoomClient({
                           {participant.deafened && (
                             <span
                               title="Áudio desativado"
-                              className="flex items-center gap-1 text-[0.38rem] text-red-300/65"
+                              className="flex items-center gap-1 text-[0.46rem] text-red-300/70"
                             >
                               <svg
                                 width="11"
@@ -4010,7 +4051,7 @@ export default function TransmissionRoomClient({
                           )}
 
                           {participant.isSharing && (
-                            <span className="flex items-center gap-1 text-[0.38rem] font-bold uppercase tracking-[0.08em] text-accent-hot">
+                            <span className="flex items-center gap-1 text-[0.46rem] font-bold uppercase tracking-[0.08em] text-accent-hot">
                               <span className="h-1.5 w-1.5 rounded-full bg-accent-hot" />
                               ao vivo
                             </span>
@@ -4124,7 +4165,7 @@ export default function TransmissionRoomClient({
         </div>
 
         {/* DOCK INFERIOR */}
-        <footer className="sticky bottom-2 z-[20] mt-2 flex flex-col gap-2 rounded-[16px] border border-white/[0.07] bg-[#111114]/94 px-2.5 py-2.5 shadow-[0_-10px_45px_rgba(0,0,0,0.24)] backdrop-blur-xl sm:bottom-3 sm:mt-3 sm:rounded-[18px] sm:px-3 sm:py-3 lg:static lg:flex-row lg:items-center lg:justify-between lg:gap-3 lg:px-4">
+        <footer className="sticky bottom-2 z-[20] mt-2 flex flex-col gap-2 rounded-[16px] border border-accent-hot/14 bg-[#111114]/96 px-2.5 py-2.5 shadow-[0_-10px_45px_rgba(0,0,0,0.24)] backdrop-blur-xl sm:bottom-3 sm:mt-3 sm:rounded-[18px] sm:px-3 sm:py-3 lg:static lg:flex-row lg:items-center lg:justify-between lg:gap-3 lg:px-4">
           {/* CONTA */}
           <div className="flex w-full min-w-0 items-center gap-2.5 lg:w-auto">
             <div
@@ -4374,7 +4415,7 @@ export default function TransmissionRoomClient({
                 type="button"
                 onClick={startScreenShare}
                 title="Compartilhar tela"
-                className="flex h-11 items-center gap-2 rounded-full bg-accent-hot px-4 text-bg-deep shadow-[0_8px_25px_rgba(255,61,129,0.12)] transition hover:-translate-y-0.5 hover:brightness-110"
+                className="flex h-11 items-center gap-2 rounded-full bg-accent-hot px-5 text-bg-deep shadow-[0_10px_32px_rgba(255,61,129,0.18)] shadow-[0_8px_25px_rgba(255,61,129,0.12)] transition hover:-translate-y-0.5 hover:brightness-110"
               >
                 <svg
                   width="18"
