@@ -407,7 +407,8 @@ export default function TransmissionRoomClient({
           ROOM_SOUNDS[sound],
         );
 
-      audio.volume = 0.28;
+      audio.volume = 0.32;
+      audio.currentTime = 0;
 
       void audio.play().catch(
         () => {
@@ -903,7 +904,8 @@ export default function TransmissionRoomClient({
             );
 
           audio.autoplay =
-                true;
+            true;
+
           audio.dataset.voiceParticipant =
             remoteId;
 
@@ -1352,6 +1354,25 @@ export default function TransmissionRoomClient({
         false,
       );
 
+      setParticipants(
+        (current) =>
+          current.map(
+            (participant) =>
+              participant.id ===
+                participantId
+                ? {
+                    ...participant,
+                    voiceReady:
+                      true,
+                    micEnabled:
+                      true,
+                    deafened:
+                      false,
+                  }
+                : participant,
+          ),
+      );
+
       await updatePresence(
         isSharingRef.current,
       );
@@ -1455,6 +1476,27 @@ export default function TransmissionRoomClient({
       false,
     );
 
+    setParticipants(
+      (current) =>
+        current.map(
+          (participant) =>
+            participant.id ===
+              participantId
+              ? {
+                  ...participant,
+                  voiceReady:
+                    false,
+                  micEnabled:
+                    true,
+                  deafened:
+                    false,
+                  isSpeaking:
+                    false,
+                }
+              : participant,
+        ),
+    );
+
     await updatePresence(
       isSharingRef.current,
     );
@@ -1486,6 +1528,23 @@ export default function TransmissionRoomClient({
 
     setMicEnabled(
       next,
+    );
+
+    setParticipants(
+      (current) =>
+        current.map(
+          (participant) =>
+            participant.id ===
+              participantId
+              ? {
+                  ...participant,
+                  micEnabled:
+                    next,
+                  voiceReady:
+                    true,
+                }
+              : participant,
+        ),
     );
 
     playUiSound(
@@ -1532,6 +1591,23 @@ export default function TransmissionRoomClient({
 
     setDeafened(
       next,
+    );
+
+    setParticipants(
+      (current) =>
+        current.map(
+          (participant) =>
+            participant.id ===
+              participantId
+              ? {
+                  ...participant,
+                  deafened:
+                    next,
+                  voiceReady:
+                    true,
+                }
+              : participant,
+        ),
     );
 
     await updatePresence(
@@ -1820,6 +1896,10 @@ export default function TransmissionRoomClient({
     if (!stream) {
       return;
     }
+
+    playUiSound(
+      'watch-start',
+    );
 
     const peer =
       createOutgoingPeer(
@@ -2206,9 +2286,6 @@ export default function TransmissionRoomClient({
         streamerId,
     });
 
-    playUiSound(
-      'watch-start',
-    );
   }
 
   async function stopWatching() {
@@ -2239,13 +2316,6 @@ export default function TransmissionRoomClient({
       null,
     );
 
-    if (
-      currentWatchingId
-    ) {
-      playUiSound(
-        'watch-stop',
-      );
-    }
   }
 
   function toggleMute() {
@@ -2394,6 +2464,26 @@ export default function TransmissionRoomClient({
   }
 
   useEffect(() => {
+    const preloadedSounds =
+      Object.values(
+        ROOM_SOUNDS,
+      ).map(
+        (path) => {
+          const audio =
+            new Audio(path);
+
+          audio.preload =
+            'auto';
+
+          audio.volume =
+            0.32;
+
+          audio.load();
+
+          return audio;
+        },
+      );
+
     const unlockSounds =
       () => {
         soundsUnlockedRef.current =
@@ -2403,11 +2493,24 @@ export default function TransmissionRoomClient({
     window.addEventListener(
       'pointerdown',
       unlockSounds,
+      {
+        passive:
+          true,
+      },
     );
 
     window.addEventListener(
       'keydown',
       unlockSounds,
+    );
+
+    window.addEventListener(
+      'touchstart',
+      unlockSounds,
+      {
+        passive:
+          true,
+      },
     );
 
     return () => {
@@ -2419,6 +2522,18 @@ export default function TransmissionRoomClient({
       window.removeEventListener(
         'keydown',
         unlockSounds,
+      );
+
+      window.removeEventListener(
+        'touchstart',
+        unlockSounds,
+      );
+
+      preloadedSounds.forEach(
+        (audio) => {
+          audio.pause();
+          audio.src = '';
+        },
       );
     };
   }, []);
@@ -2524,28 +2639,53 @@ export default function TransmissionRoomClient({
                   ),
 
                 isSharing:
-                  Boolean(
-                    data.isSharing,
-                  ),
+                  (
+                    data.id ===
+                    participantId
+                  )
+                    ? isSharingRef.current
+                    : Boolean(
+                        data.isSharing,
+                      ),
 
                 voiceReady:
-                  Boolean(
-                    data.voiceReady,
-                  ),
+                  (
+                    data.id ===
+                    participantId
+                  )
+                    ? voiceReadyRef.current
+                    : Boolean(
+                        data.voiceReady,
+                      ),
 
                 micEnabled:
-                  data.micEnabled !==
-                  false,
+                  (
+                    data.id ===
+                    participantId
+                  )
+                    ? micEnabledRef.current
+                    : data.micEnabled !==
+                        false,
 
                 deafened:
-                  Boolean(
-                    data.deafened,
-                  ),
+                  (
+                    data.id ===
+                    participantId
+                  )
+                    ? deafenedRef.current
+                    : Boolean(
+                        data.deafened,
+                      ),
 
                 isSpeaking:
-                  Boolean(
-                    data.isSpeaking,
-                  ),
+                  (
+                    data.id ===
+                    participantId
+                  )
+                    ? localSpeakingRef.current
+                    : Boolean(
+                        data.isSpeaking,
+                      ),
 
                 joinedAt:
                   data.joinedAt ??
@@ -2715,9 +2855,6 @@ export default function TransmissionRoomClient({
             null,
           );
 
-          playUiSound(
-            'watch-stop',
-          );
         }
       }
     }
@@ -2791,6 +2928,14 @@ export default function TransmissionRoomClient({
               closeOutgoingPeer(
                 signal.senderId,
               );
+
+              if (
+                isSharingRef.current
+              ) {
+                playUiSound(
+                  'watch-stop',
+                );
+              }
 
               break;
             }
@@ -3091,18 +3236,23 @@ export default function TransmissionRoomClient({
       <div className="pointer-events-none absolute left-1/2 top-[-180px] h-[520px] w-[900px] -translate-x-1/2 rounded-full bg-accent-hot/[0.045] blur-[180px]" />
       <div className="pointer-events-none absolute bottom-[-220px] left-[20%] h-[500px] w-[500px] rounded-full bg-accent-hot/[0.025] blur-[170px]" />
 
-      <div className="relative mx-auto flex min-h-[calc(100vh-1rem)] max-w-[1720px] flex-col sm:min-h-[calc(100vh-1.5rem)] lg:min-h-[calc(100vh-2rem)]">
+      <div className="relative mx-auto flex min-h-[calc(100vh-1rem)] max-w-[1840px] flex-col sm:min-h-[calc(100vh-1.5rem)] lg:min-h-[calc(100vh-2rem)]">
         {/* TOPBAR */}
         <header className="mb-3 overflow-hidden rounded-[18px] border border-white/[0.07] bg-[#0f0f12]/92 shadow-[0_14px_55px_rgba(0,0,0,0.3)] backdrop-blur-xl">
           <div className="h-px w-full bg-gradient-to-r from-transparent via-accent-hot/45 to-transparent" />
 
-          <div className="flex min-h-[58px] flex-wrap items-center justify-between gap-2 px-3 py-2.5 sm:min-h-[62px] sm:gap-3 sm:px-4 sm:py-3 lg:px-5">
+          <div className="flex min-h-[72px] flex-wrap items-center justify-between gap-3 px-4 py-3.5 sm:min-h-[62px] sm:gap-3 sm:px-4 sm:py-3 lg:px-5">
             {/* IDENTIDADE */}
             <div className="flex min-w-0 items-center gap-3">
-              <div className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-accent-hot/22 bg-accent-hot/[0.055]">
-                <span className="font-display text-[1.05rem] font-semibold text-accent-hot">
-                  G
-                </span>
+              <div className="relative flex h-12 min-w-[138px] items-center rounded-xl border border-white/[0.06] bg-black/15 px-3">
+                <Image
+                  src="/assets/grudge-logo.png"
+                  alt="GRUDGE SMP"
+                  width={1536}
+                  height={512}
+                  priority
+                  className="h-8 w-auto max-w-[150px] object-contain object-left"
+                />
 
                 <span
                   className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#0f0f12] ${
@@ -3117,12 +3267,8 @@ export default function TransmissionRoomClient({
 
               <div className="min-w-0">
                 <div className="flex min-w-0 items-center gap-2">
-                  <span className="truncate font-display text-[0.98rem] font-semibold tracking-[0.08em] text-text-main">
-                    GRUDGE
-                  </span>
-
-                  <span className="hidden text-[0.38rem] font-bold uppercase tracking-[0.15em] text-text-dim/35 sm:inline">
-                    transmissão
+                  <span className="hidden text-[0.42rem] font-bold uppercase tracking-[0.17em] text-text-dim/45 sm:inline">
+                    transmissão privada
                   </span>
                 </div>
 
@@ -3300,10 +3446,10 @@ export default function TransmissionRoomClient({
         </header>
 
         {/* ÁREA PRINCIPAL */}
-        <div className="grid min-h-0 flex-1 gap-2.5 lg:grid-cols-[minmax(0,1fr)_290px] lg:gap-3">
+        <div className="grid min-h-0 flex-1 gap-2.5 lg:grid-cols-[minmax(0,1fr)_330px] lg:gap-3">
           <section className="flex min-h-0 flex-col gap-3">
             {/* PALCO */}
-            <div className="group/stage relative min-h-[300px] flex-1 overflow-hidden rounded-[16px] border border-white/[0.07] bg-[#050506] shadow-[0_24px_90px_rgba(0,0,0,0.32)] sm:min-h-[380px] sm:rounded-[18px] lg:min-h-[440px] lg:rounded-[20px]">
+            <div className="group/stage relative min-h-[360px] flex-1 overflow-hidden rounded-[16px] border border-white/[0.07] bg-[#050506] shadow-[0_24px_90px_rgba(0,0,0,0.32)] sm:min-h-[440px] sm:rounded-[18px] lg:min-h-[540px] lg:rounded-[20px]">
               <div className="pointer-events-none absolute inset-0 z-[1] bg-[radial-gradient(circle_at_50%_0%,rgba(255,61,129,0.06),transparent_36%)]" />
 
               <video
@@ -3690,7 +3836,7 @@ export default function TransmissionRoomClient({
           </section>
 
           {/* SIDEBAR DE PARTICIPANTES */}
-          <aside className="flex max-h-[42vh] min-h-[260px] flex-col overflow-hidden rounded-[16px] border border-white/[0.07] bg-[#111114]/84 shadow-[0_20px_70px_rgba(0,0,0,0.18)] sm:max-h-[48vh] sm:min-h-[320px] sm:rounded-[18px] lg:max-h-none lg:min-h-[400px] lg:rounded-[20px]">
+          <aside className="flex max-h-[48vh] min-h-[320px] flex-col overflow-hidden rounded-[16px] border border-white/[0.07] bg-[#111114]/84 shadow-[0_20px_70px_rgba(0,0,0,0.18)] sm:max-h-[54vh] sm:min-h-[370px] sm:rounded-[18px] lg:max-h-none lg:min-h-[400px] lg:rounded-[20px]">
             <div className="border-b border-white/[0.07] px-3 py-3 sm:px-4 sm:py-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
