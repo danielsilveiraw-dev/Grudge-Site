@@ -1532,7 +1532,7 @@ export default function TransmissionRoomClient({
         false,
       );
 
-      remoteAudioRefs.current.forEach(
+      remoteAudioElementsRef.current.forEach(
         (audio) => {
           audio.muted =
             false;
@@ -1624,7 +1624,7 @@ export default function TransmissionRoomClient({
      * recebido. Não altera o estado real
      * do microfone.
      */
-    remoteAudioRefs.current.forEach(
+    remoteAudioElementsRef.current.forEach(
       (audio) => {
         audio.muted =
           next;
