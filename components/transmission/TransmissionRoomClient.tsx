@@ -113,10 +113,38 @@ type TransmissionRoomClientProps = {
   supabaseAnonKey: string;
 };
 
+/*
+ * ICE servers: STUN sozinho não é suficiente para boa parte dos
+ * usuários (CGNAT de operadora móvel, redes corporativas/escolares,
+ * NAT simétrico). Sem um TURN de relay, a negociação WebRTC fica
+ * travada em "checking"/"failed" e o resultado visual é tela preta
+ * no vídeo e silêncio na voz. Por isso o TURN da Metered (Open Relay)
+ * está incluso aqui — ele é usado tanto pelos peers de voz quanto
+ * pelos de compartilhamento de tela.
+ */
 const ICE_SERVERS: RTCIceServer[] = [
   {
-    urls:
-      'stun:stun.cloudflare.com:3478',
+    urls: 'stun:stun.relay.metered.ca:80',
+  },
+  {
+    urls: 'turn:global.relay.metered.ca:80',
+    username: '5faa627293c6cd4e7b69af02',
+    credential: 'ksc953HmyrZ+RQaN',
+  },
+  {
+    urls: 'turn:global.relay.metered.ca:80?transport=tcp',
+    username: '5faa627293c6cd4e7b69af02',
+    credential: 'ksc953HmyrZ+RQaN',
+  },
+  {
+    urls: 'turn:global.relay.metered.ca:443',
+    username: '5faa627293c6cd4e7b69af02',
+    credential: 'ksc953HmyrZ+RQaN',
+  },
+  {
+    urls: 'turns:global.relay.metered.ca:443?transport=tcp',
+    username: '5faa627293c6cd4e7b69af02',
+    credential: 'ksc953HmyrZ+RQaN',
   },
 ];
 
@@ -321,6 +349,16 @@ export default function TransmissionRoomClient({
     );
 
   const remoteVideoRef =
+    useRef<HTMLVideoElement | null>(
+      null,
+    );
+
+  /*
+   * Preview da própria tela: alimentado diretamente por
+   * localStreamRef, sem passar por WebRTC — é só um espelho
+   * local do que você está compartilhando.
+   */
+  const localVideoRef =
     useRef<HTMLVideoElement | null>(
       null,
     );
@@ -1964,6 +2002,23 @@ export default function TransmissionRoomClient({
         viewerId,
       );
 
+    /*
+     * Guarda contra glare: o viewer reenvia
+     * 'watch-request' se o stream não chegar
+     * em 900ms (ver requestRemoteStream). Sem
+     * essa checagem, uma segunda oferta seria
+     * criada enquanto a primeira ainda está
+     * "em voo" (signalingState !== 'stable'),
+     * quebrando a negociação e travando a
+     * tela do viewer em preto.
+     */
+    if (
+      peer.signalingState !==
+      'stable'
+    ) {
+      return;
+    }
+
     if (!alreadyWatching) {
       playUiSound(
         'watch-start',
@@ -2294,6 +2349,13 @@ export default function TransmissionRoomClient({
 
     localStreamRef.current =
       null;
+
+    if (
+      localVideoRef.current
+    ) {
+      localVideoRef.current.srcObject =
+        null;
+    }
 
     closeAllOutgoingPeers();
 
@@ -2668,6 +2730,22 @@ export default function TransmissionRoomClient({
       );
     };
   }, []);
+
+  /*
+   * Preview local: sempre que isSharing mudar para true,
+   * conecta o stream de captura direto no <video> local
+   * (sem WebRTC nenhum, é só um espelho da própria tela).
+   */
+  useEffect(() => {
+    if (
+      isSharing &&
+      localVideoRef.current &&
+      localStreamRef.current
+    ) {
+      localVideoRef.current.srcObject =
+        localStreamRef.current;
+    }
+  }, [isSharing]);
 
   useEffect(() => {
     presenceInitializedRef.current =
@@ -3831,6 +3909,31 @@ export default function TransmissionRoomClient({
                 }`}
               />
 
+              {/* PREVIEW DA PRÓPRIA TELA */}
+              <video
+                ref={localVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className={`absolute inset-0 h-full w-full object-contain transition duration-300 ${
+                  isSharing && !watchingId
+                    ? 'block'
+                    : 'hidden'
+                }`}
+              />
+
+              {isSharing && !watchingId && (
+                <div className="pointer-events-none absolute inset-x-0 top-0 z-[4] flex items-start justify-between gap-3 bg-gradient-to-b from-black/70 via-black/20 to-transparent p-4">
+                  <div className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-black/55 px-3 py-2 shadow-lg backdrop-blur-xl">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent-hot" />
+
+                    <span className="text-[0.44rem] font-bold uppercase tracking-[0.1em] text-accent-hot">
+                      prévia da sua transmissão — os outros veem isso ao vivo
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {/* BARRA SUPERIOR DA LIVE */}
               {watchingParticipant && (
                 <div className="pointer-events-none absolute inset-x-0 top-0 z-[4] flex items-start justify-between gap-3 bg-gradient-to-b from-black/70 via-black/20 to-transparent p-4 opacity-100 transition duration-300 lg:opacity-0 lg:group-hover/stage:opacity-100">
@@ -3883,7 +3986,7 @@ export default function TransmissionRoomClient({
               )}
 
               {/* ESTADO VAZIO */}
-              {!watchingId && (
+              {!watchingId && !isSharing && (
                 <div className="absolute inset-0 z-[2] flex items-center justify-center p-8 text-center">
                   <div className="max-w-[470px]">
                     <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[20px] border border-white/[0.07] bg-white/[0.025] text-text-dim/55 shadow-[0_18px_50px_rgba(0,0,0,0.22)]">
@@ -3927,13 +4030,6 @@ export default function TransmissionRoomClient({
                         ? 'Selecione uma pessoa ao vivo na lateral ou na faixa abaixo.'
                         : 'Quando alguém compartilhar a tela, a transmissão aparecerá aqui.'}
                     </p>
-
-                    {isSharing && (
-                      <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-accent-hot/25 bg-accent-hot/[0.06] px-3 py-1.5 text-[0.42rem] font-bold uppercase tracking-[0.12em] text-accent-hot">
-                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent-hot" />
-                        sua tela está ao vivo
-                      </div>
-                    )}
                   </div>
                 </div>
               )}
